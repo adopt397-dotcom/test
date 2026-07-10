@@ -3002,6 +3002,838 @@ function renderGraphic(jsonData) {
 }
 
 // ========================================================================
+// BLOCK 1210: renderGraphic (통합 렌더러) - graphic 타입 추가됨
+// ========================================================================
+function renderGraphic(jsonData) {
+  if (!jsonData || jsonData.trim() == "") return "";
+  
+  var data = jsonData.trim();
+  if (data.startsWith("\"") && data.endsWith("\"")) data = data.slice(1, -1);
+  data = data.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  
+  var parsedData = null;
+  try {
+    parsedData = JSON.parse(data);
+  } catch(e) {
+    return '<div style="padding:10px;color:#999;text-align:center;">📊 Invalid JSON</div>';
+  }
+  
+  if (!parsedData || typeof parsedData !== 'object') {
+    return '<div style="padding:10px;color:#999;text-align:center;">📊 No data</div>';
+  }
+  
+  var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#2c3e50', '#7f8c8d', '#16a085', '#d35400', '#c0392b'];
+  var chartId = 'chart_' + Math.random().toString(36).substr(2, 9);
+  var html = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;"><canvas id="' + chartId + '" style="max-height:400px;width:100%;"></canvas></div>';
+  
+  // TABLE
+  if (parsedData.type === 'table' && parsedData.headers && parsedData.rows) {
+    var h = '<div style="margin:15px 0;overflow-x:auto;background:white;border-radius:8px;border:1px solid #ddd;"><table style="width:100%;border-collapse:collapse;text-align:center;font-size:14px;">';
+    h += '<thead><tr style="background:#3498db;color:white;">';
+    parsedData.headers.forEach(function(hd) { 
+      h += '<th style="padding:10px 14px;border:1px solid #2980b9;font-weight:bold;">' + escapeHtml(hd) + '</th>'; 
+    });
+    h += '</tr></thead><tbody>';
+    parsedData.rows.forEach(function(row, ri) {
+      h += '<tr style="background:' + (ri%2===0?'#fff':'#f8f9fa') + ';">';
+      row.forEach(function(cell) { 
+        h += '<td style="padding:8px 14px;border:1px solid #ddd;">' + escapeHtml(cell) + '</td>'; 
+      });
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+    if (parsedData.title) h += '<div style="text-align:center;padding:8px;font-weight:bold;color:#555;background:#f8f9fa;border-radius:0 0 8px 8px;">' + escapeHtml(parsedData.title) + '</div>';
+    h += '</div>';
+    return h;
+  }
+  
+  // BAR
+  else if (parsedData.type === 'bar') {
+    console.log("✅ BAR rendering started");
+    
+    var labels = [];
+    var datasets = [];
+    var chartTitle = parsedData.title || 'Bar Chart';
+    var xLabel = parsedData.xAxis?.label || '';
+    var yLabel = parsedData.yAxis?.label || '';
+    var yMin = parsedData.yAxis?.min !== undefined ? parsedData.yAxis.min : 0;
+    var yMax = parsedData.yAxis?.max !== undefined ? parsedData.yAxis.max : undefined;
+    
+    if (parsedData.labels) {
+      labels = parsedData.labels;
+    } else if (parsedData.xAxis?.categories) {
+      labels = parsedData.xAxis.categories;
+    }
+    
+    if (parsedData.series && Array.isArray(parsedData.series)) {
+      datasets = parsedData.series.map(function(s, i) {
+        var color = colors[i % colors.length];
+        var data = s.data || [];
+        return {
+          label: s.name || 'Series ' + (i+1),
+          data: data,
+          backgroundColor: color + '80',
+          borderColor: color,
+          borderWidth: 2
+        };
+      });
+    } else if (parsedData.values) {
+      datasets = [{
+        label: parsedData.label || 'Data',
+        data: parsedData.values,
+        backgroundColor: parsedData.color || '#3498db80',
+        borderColor: parsedData.stroke || '#3498db',
+        borderWidth: 2
+      }];
+    }
+    
+    console.log("📊 labels:", labels);
+    console.log("📊 datasets:", datasets);
+    
+    if (datasets.length === 0 || datasets.every(function(d) { return d.data.length === 0; })) {
+      return '<div style="padding:10px;color:#999;text-align:center;">📊 No data for bar chart</div>';
+    }
+    
+    function renderBarChart(attempt) {
+      attempt = attempt || 0;
+      var ctx = document.getElementById(chartId);
+      if (!ctx) {
+        if (attempt < 5) {
+          console.log("⏳ Canvas not ready, retrying... (" + (attempt+1) + "/5)");
+          setTimeout(function() { renderBarChart(attempt + 1); }, 200);
+          return;
+        } else {
+          console.error("❌ Canvas not found after 5 attempts!");
+          return;
+        }
+      }
+      
+      if (window._chartInstances && window._chartInstances[chartId]) {
+        window._chartInstances[chartId].destroy();
+      }
+      if (!window._chartInstances) window._chartInstances = {};
+      
+      var cc = {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: chartTitle, font: { size: 16, weight: 'bold' } },
+            legend: { position: 'bottom' }
+          },
+          scales: {
+            x: { title: { display: true, text: xLabel }, grid: { color: '#e0e0e0' } },
+            y: { 
+              beginAtZero: true, 
+              title: { display: true, text: yLabel }, 
+              grid: { color: '#e0e0e0' }, 
+              min: yMin, 
+              max: yMax 
+            }
+          }
+        }
+      };
+      
+      var canvas = document.getElementById(chartId);
+      if (canvas && cc) {
+        canvas.parentElement.style.height = '400px';
+        window._chartInstances[chartId] = new Chart(canvas, cc);
+        console.log("✅ Bar chart rendered!");
+        RendererManager.registerChart(window._chartInstances[chartId]);
+      } else {
+        console.error("❌ Failed to render bar chart");
+      }
+    }
+    
+    setTimeout(function() { renderBarChart(); }, 100);
+    return html;
+  }
+  
+  // PIE
+  else if (parsedData.type === 'pie' && parsedData.labels && parsedData.values) {
+    setTimeout(function() {
+      var ctx = document.getElementById(chartId);
+      if (!ctx) return;
+      if (window._chartInstances && window._chartInstances[chartId]) {
+        window._chartInstances[chartId].destroy();
+      }
+      if (!window._chartInstances) window._chartInstances = {};
+      
+      var cc = {
+        type: 'pie',
+        data: {
+          labels: parsedData.labels,
+          datasets: [{
+            data: parsedData.values,
+            backgroundColor: parsedData.colors || ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: parsedData.title || 'Pie Chart', font: { size: 16, weight: 'bold' } },
+            legend: { position: 'bottom' }
+          }
+        }
+      };
+      
+      var canvas = document.getElementById(chartId);
+      if (canvas && cc) {
+        canvas.parentElement.style.height = '400px';
+        window._chartInstances[chartId] = new Chart(canvas, cc);
+        RendererManager.registerChart(window._chartInstances[chartId]);
+      }
+    }, 100);
+    return html;
+  }
+  
+  // LINE
+  else if (parsedData.type === 'line' && parsedData.series) {
+    setTimeout(function() {
+      var ctx = document.getElementById(chartId);
+      if (!ctx) return;
+      if (window._chartInstances && window._chartInstances[chartId]) {
+        window._chartInstances[chartId].destroy();
+      }
+      if (!window._chartInstances) window._chartInstances = {};
+      
+      var ds = parsedData.series.map(function(s, i) {
+        var points = [];
+        if (Array.isArray(s.points)) {
+          points = s.points;
+        } else if (typeof s.points === 'string') {
+          try { points = JSON.parse(s.points); } catch(e) { points = []; }
+        } else if (Array.isArray(s.data) && parsedData.xAxis && Array.isArray(parsedData.xAxis.categories)) {
+          points = s.data.map(function(y, idx) {
+            return { x: parsedData.xAxis.categories[idx], y: y };
+          });
+        } else if (Array.isArray(s.data) && s.data.length && typeof s.data[0] === 'object') {
+          points = s.data;
+        }
+        return {
+          label: s.name || ('Series ' + (i + 1)),
+          data: points,
+          showLine: true,
+          borderColor: s.color || colors[i % colors.length],
+          backgroundColor: (s.color || colors[i % colors.length]) + '20',
+          borderWidth: s.lineWidth || 2,
+          pointRadius: s.pointSize || 4,
+          tension: s.tension || 0.3,
+          fill: s.fill || false
+        };
+      });
+      
+      var cc = {
+        type: 'scatter',
+        data: { datasets: ds },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: parsedData.title || 'Line Chart', font: { size: 16, weight: 'bold' } },
+            legend: { position: 'bottom' }
+          },
+          scales: {
+            x: { type: 'linear', title: { display: true, text: (parsedData.xAxis && (parsedData.xAxis.title || parsedData.xAxis.label)) || 'X' }, grid: { color: '#e0e0e0' } },
+            y: { title: { display: true, text: (parsedData.yAxis && (parsedData.yAxis.title || parsedData.yAxis.label)) || 'Y' }, grid: { color: '#e0e0e0' } }
+          }
+        }
+      };
+      
+      var canvas = document.getElementById(chartId);
+      if (canvas && cc) {
+        canvas.parentElement.style.height = '400px';
+        window._chartInstances[chartId] = new Chart(canvas, cc);
+        RendererManager.registerChart(window._chartInstances[chartId]);
+      }
+    }, 100);
+    return html;
+  }
+  
+  // SCATTER
+  else if (parsedData.type === 'scatter') {
+    console.log("✅ SCATTER rendering started");
+    
+    setTimeout(function() {
+      var ctx = document.getElementById(chartId);
+      if (!ctx) {
+        console.error("❌ Canvas not found!");
+        return;
+      }
+      if (window._chartInstances && window._chartInstances[chartId]) {
+        window._chartInstances[chartId].destroy();
+      }
+      if (!window._chartInstances) window._chartInstances = {};
+      
+      var datasets = [];
+      
+      if (parsedData.series && Array.isArray(parsedData.series)) {
+        parsedData.series.forEach(function(ser, i) {
+          var color = colors[i % colors.length];
+          datasets.push({
+            label: ser.name || 'Series ' + (i+1),
+            data: (ser.points || []).map(function(p) { return { x: p.x, y: p.y }; }),
+            backgroundColor: color,
+            borderColor: color,
+            pointRadius: 5,
+            pointHoverRadius: 7
+          });
+        });
+      } else if (parsedData.points) {
+        datasets.push({
+          label: parsedData.title || 'Data',
+          data: parsedData.points.map(function(p) { return { x: p.x, y: p.y }; }),
+          backgroundColor: '#3498db',
+          borderColor: '#2980b9',
+          pointRadius: 5,
+          pointHoverRadius: 7
+        });
+      }
+      
+      if (datasets.length === 0) {
+        console.warn("⚠️ No data");
+        return;
+      }
+      
+      var cc = {
+        type: 'scatter',
+        data: { datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: parsedData.title || 'Scatter Plot', font: { size: 16, weight: 'bold' } },
+            legend: { position: 'bottom' }
+          },
+          scales: {
+            x: { title: { display: true, text: parsedData.xAxis?.label || 'x' }, min: parsedData.xAxis?.min, max: parsedData.xAxis?.max, grid: { color: '#e0e0e0' } },
+            y: { title: { display: true, text: parsedData.yAxis?.label || 'y' }, min: parsedData.yAxis?.min, max: parsedData.yAxis?.max, grid: { color: '#e0e0e0' } }
+          }
+        }
+      };
+      
+      var canvas = document.getElementById(chartId);
+      if (canvas && cc) {
+        canvas.parentElement.style.height = '400px';
+        window._chartInstances[chartId] = new Chart(canvas, cc);
+        console.log("✅ Scatter chart rendered!");
+        RendererManager.registerChart(window._chartInstances[chartId]);
+      }
+    }, 100);
+    return html;
+  }
+  
+  // RADAR
+  else if (parsedData.type === 'radar' && parsedData.labels && parsedData.datasets) {
+    setTimeout(function() {
+      var ctx = document.getElementById(chartId);
+      if (!ctx) return;
+      if (window._chartInstances && window._chartInstances[chartId]) {
+        window._chartInstances[chartId].destroy();
+      }
+      if (!window._chartInstances) window._chartInstances = {};
+      
+      var ds = parsedData.datasets.map(function(d, i) {
+        var values = d.values || [];
+        if (typeof values === 'string') {
+          try { values = JSON.parse(values); } catch(e) { values = values.split(',').map(function(v) { return parseFloat(v.trim()); }); }
+        }
+        return {
+          label: d.label || 'Series ' + (i+1),
+          data: values,
+          borderColor: d.color || colors[i % colors.length],
+          backgroundColor: (d.color || colors[i % colors.length]) + '20',
+          borderWidth: 2,
+          pointRadius: 4
+        };
+      });
+      
+      var cc = {
+        type: 'radar',
+        data: { labels: parsedData.labels, datasets: ds },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: parsedData.title || 'Radar Chart', font: { size: 16, weight: 'bold' } }
+          },
+          scales: {
+            r: { beginAtZero: true, grid: { color: '#e0e0e0' } }
+          }
+        }
+      };
+      
+      var canvas = document.getElementById(chartId);
+      if (canvas && cc) {
+        canvas.parentElement.style.height = '400px';
+        window._chartInstances[chartId] = new Chart(canvas, cc);
+        RendererManager.registerChart(window._chartInstances[chartId]);
+      }
+    }, 100);
+    return html;
+  }
+  
+  // SCATTER-ONLY
+  else if (parsedData.type === 'scatter-only' && parsedData.points) {
+    setTimeout(function() {
+      var ctx = document.getElementById(chartId);
+      if (!ctx) return;
+      if (window._chartInstances && window._chartInstances[chartId]) {
+        window._chartInstances[chartId].destroy();
+      }
+      if (!window._chartInstances) window._chartInstances = {};
+      
+      var dataPoints = parsedData.points.map(function(p) {
+        return { x: p.x, y: p.y };
+      });
+      
+      var minX = parsedData.xAxis?.min ?? 0;
+      var maxX = parsedData.xAxis?.max ?? 10;
+      var minY = parsedData.yAxis?.min ?? -10;
+      var maxY = parsedData.yAxis?.max ?? 10;
+      
+      var cc = {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: parsedData.title || 'Scatterplot',
+            data: dataPoints,
+            backgroundColor: '#3498db',
+            borderColor: '#2980b9',
+            pointRadius: 5,
+            pointHoverRadius: 7
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: parsedData.title || 'Scatterplot', font: { size: 16, weight: 'bold' } },
+            legend: { display: false }
+          },
+          scales: {
+            x: {
+              min: minX,
+              max: maxX,
+              grid: { color: '#e0e0e0' },
+              title: { display: true, text: parsedData.xAxis?.label || 'x' }
+            },
+            y: {
+              min: minY,
+              max: maxY,
+              grid: { color: '#e0e0e0' },
+              title: { display: true, text: parsedData.yAxis?.label || 'y' }
+            }
+          }
+        }
+      };
+      
+      var canvas = document.getElementById(chartId);
+      if (canvas && cc) {
+        canvas.parentElement.style.height = '400px';
+        window._chartInstances[chartId] = new Chart(canvas, cc);
+        RendererManager.registerChart(window._chartInstances[chartId]);
+      }
+    }, 100);
+    return html;
+  }
+  
+  // STACKED-BAR
+  else if (parsedData.type === 'stacked-bar' && parsedData.labels && parsedData.datasets) {
+    var stackedChartId = 'chart_' + Math.random().toString(36).substr(2, 9);
+    var stackedHtml = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;"><canvas id="' + stackedChartId + '" style="max-height:400px;width:100%;"></canvas></div>';
+    
+    setTimeout(function() {
+      var ctx = document.getElementById(stackedChartId);
+      if (!ctx) return;
+      if (window._chartInstances && window._chartInstances[stackedChartId]) {
+        window._chartInstances[stackedChartId].destroy();
+      }
+      if (!window._chartInstances) window._chartInstances = {};
+      
+      var datasets = parsedData.datasets.map(function(ds, i) {
+        var color = colors[i % colors.length];
+        return {
+          label: ds.label || 'Series ' + (i+1),
+          data: ds.values || [],
+          backgroundColor: color + '80',
+          borderColor: color,
+          borderWidth: 1
+        };
+      });
+      
+      var cc = {
+        type: 'bar',
+        data: {
+          labels: parsedData.labels,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: parsedData.title || 'Stacked Bar Chart', font: { size: 16, weight: 'bold' } },
+            legend: { position: 'bottom' }
+          },
+          scales: {
+            x: { stacked: true, grid: { color: '#e0e0e0' } },
+            y: { stacked: true, beginAtZero: true, grid: { color: '#e0e0e0' } }
+          }
+        }
+      };
+      
+      var canvas = document.getElementById(stackedChartId);
+      if (canvas && cc) {
+        canvas.parentElement.style.height = '400px';
+        window._chartInstances[stackedChartId] = new Chart(canvas, cc);
+        RendererManager.registerChart(window._chartInstances[stackedChartId]);
+      }
+    }, 100);
+    return stackedHtml;
+  }
+  
+  // COMPARE
+  else if (parsedData.type === 'compare' && parsedData.graphs) {
+    var compareChartId = 'chart_' + Math.random().toString(36).substr(2, 9);
+    var compareHtml = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;"><canvas id="' + compareChartId + '" style="max-height:400px;width:100%;"></canvas></div>';
+    
+    setTimeout(function() {
+      var ctx = document.getElementById(compareChartId);
+      if (!ctx) return;
+      if (window._chartInstances && window._chartInstances[compareChartId]) {
+        window._chartInstances[compareChartId].destroy();
+      }
+      if (!window._chartInstances) window._chartInstances = {};
+      
+      var allPoints = [];
+      parsedData.graphs.forEach(function(g) {
+        if (g.points) {
+          g.points.forEach(function(p) {
+            allPoints.push(p.x !== undefined ? p.x : 0);
+          });
+        }
+      });
+      
+      var minX = Infinity, maxX = -Infinity;
+      var minY = Infinity, maxY = -Infinity;
+      parsedData.graphs.forEach(function(g) {
+        if (g.points) {
+          g.points.forEach(function(p) {
+            var x = p.x !== undefined ? p.x : 0;
+            var y = p.y !== undefined ? p.y : 0;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          });
+        }
+      });
+      
+      if (minX === Infinity) { minX = 0; maxX = 10; }
+      if (minY === Infinity) { minY = 0; maxY = 10; }
+      var paddingX = (maxX - minX) * 0.1 || 1;
+      var paddingY = (maxY - minY) * 0.1 || 1;
+      
+      var datasets = parsedData.graphs.map(function(g, i) {
+        var color = colors[i % colors.length];
+        var data = [];
+        if (g.points) {
+          data = g.points.map(function(p) {
+            return { x: p.x !== undefined ? p.x : 0, y: p.y !== undefined ? p.y : 0 };
+          });
+        }
+        return {
+          label: g.label || 'Series ' + (i+1),
+          data: data,
+          borderColor: color,
+          backgroundColor: color + '20',
+          pointRadius: 4,
+          pointBackgroundColor: color,
+          tension: 0.3,
+          showLine: true,
+          fill: false
+        };
+      });
+      
+      var cc = {
+        type: 'scatter',
+        data: { datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: parsedData.title || 'Comparison Chart', font: { size: 16, weight: 'bold' } },
+            legend: { position: 'bottom' }
+          },
+          scales: {
+            x: { 
+              type: 'linear',
+              min: minX - paddingX,
+              max: maxX + paddingX,
+              grid: { color: '#e0e0e0' },
+              title: { display: true, text: parsedData.xAxis?.label || '' }
+            },
+            y: {
+              min: minY - paddingY,
+              max: maxY + paddingY,
+              grid: { color: '#e0e0e0' },
+              title: { display: true, text: parsedData.yAxis?.label || '' }
+            }
+          }
+        }
+      };
+      
+      var canvas = document.getElementById(compareChartId);
+      if (canvas && cc) {
+        canvas.parentElement.style.height = '400px';
+        window._chartInstances[compareChartId] = new Chart(canvas, cc);
+        RendererManager.registerChart(window._chartInstances[compareChartId]);
+      }
+    }, 100);
+    return compareHtml;
+  }
+  
+  // FUNCTION (Math.js + Canvas)
+  else if (parsedData.type === 'function' && parsedData.equation) {
+    var funcCanvasId = 'chart_' + Math.random().toString(36).substr(2, 9);
+    var funcHtml = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;position:relative;">' +
+      '<canvas id="' + funcCanvasId + '" style="width:100%;height:400px;display:block;border-radius:4px;"></canvas>' +
+      '</div>';
+    
+    setTimeout(function() {
+      var canvas = document.getElementById(funcCanvasId);
+      if (!canvas) return;
+      
+      var rect = canvas.parentElement.getBoundingClientRect();
+      var dpr = window.devicePixelRatio || 1;
+      var w = canvas.parentElement.clientWidth || 600;
+      var h = 400;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      
+      var ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      
+      var equation = parsedData.equation.replace(/y\s*=\s*/, '');
+      var xMin = parsedData.xAxis?.min !== undefined ? parsedData.xAxis.min : -10;
+      var xMax = parsedData.xAxis?.max !== undefined ? parsedData.xAxis.max : 10;
+      var yMin = parsedData.yAxis?.min !== undefined ? parsedData.yAxis.min : -10;
+      var yMax = parsedData.yAxis?.max !== undefined ? parsedData.yAxis.max : 10;
+      var samples = 1000;
+      var color = parsedData.color || '#e74c3c';
+      var lineWidth = parsedData.lineWidth || 3;
+      
+      var padding = 40;
+      var graphW = w - padding * 2;
+      var graphH = h - padding * 2;
+      
+      function worldToScreen(wx, wy) {
+        var sx = padding + ((wx - xMin) / (xMax - xMin)) * graphW;
+        var sy = padding + graphH - ((wy - yMin) / (yMax - yMin)) * graphH;
+        return { x: sx, y: sy };
+      }
+      
+      function evaluate(expr, x) {
+        try {
+          var node = math.parse(expr);
+          var result = node.evaluate({ x: x });
+          return typeof result === 'number' && isFinite(result) ? result : NaN;
+        } catch(e) {
+          return NaN;
+        }
+      }
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      
+      ctx.strokeStyle = '#f0f0f0';
+      ctx.lineWidth = 1;
+      for (var x = Math.ceil(xMin); x <= Math.floor(xMax); x++) {
+        var pos = worldToScreen(x, 0);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, padding);
+        ctx.lineTo(pos.x, padding + graphH);
+        ctx.stroke();
+      }
+      for (var y = Math.ceil(yMin); y <= Math.floor(yMax); y++) {
+        if (y === 0) continue;
+        var pos = worldToScreen(0, y);
+        ctx.beginPath();
+        ctx.moveTo(padding, pos.y);
+        ctx.lineTo(padding + graphW, pos.y);
+        ctx.stroke();
+      }
+      
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 2;
+      var origin = worldToScreen(0, 0);
+      if (origin.x >= padding && origin.x <= padding + graphW) {
+        ctx.beginPath();
+        ctx.moveTo(origin.x, padding);
+        ctx.lineTo(origin.x, padding + graphH);
+        ctx.stroke();
+      }
+      if (origin.y >= padding && origin.y <= padding + graphH) {
+        ctx.beginPath();
+        ctx.moveTo(padding, origin.y);
+        ctx.lineTo(padding + graphW, origin.y);
+        ctx.stroke();
+      }
+      
+      ctx.fillStyle = '#333';
+      if (origin.x >= padding && origin.x <= padding + graphW) {
+        ctx.beginPath();
+        ctx.moveTo(origin.x, padding);
+        ctx.lineTo(origin.x - 6, padding + 8);
+        ctx.lineTo(origin.x + 6, padding + 8);
+        ctx.fill();
+      }
+      if (origin.y >= padding && origin.y <= padding + graphH) {
+        ctx.beginPath();
+        ctx.moveTo(padding + graphW, origin.y);
+        ctx.lineTo(padding + graphW - 8, origin.y - 6);
+        ctx.lineTo(padding + graphW - 8, origin.y + 6);
+        ctx.fill();
+      }
+      
+      ctx.fillStyle = '#555';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(parsedData.xAxis?.label || 'x', padding + graphW / 2, h - 18);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(parsedData.yAxis?.label || 'y', 12, padding);
+      
+      var points = [];
+      var step = (xMax - xMin) / samples;
+      for (var xVal = xMin; xVal <= xMax; xVal += step) {
+        var yVal = evaluate(equation, xVal);
+        if (!isNaN(yVal) && isFinite(yVal) && yVal >= yMin && yVal <= yMax) {
+          points.push({ x: xVal, y: yVal });
+        } else if (points.length > 0) {
+          points.push({ x: xVal, y: NaN });
+        }
+      }
+      
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      
+      var i = 0;
+      while (i < points.length) {
+        while (i < points.length && isNaN(points[i].y)) i++;
+        if (i >= points.length) break;
+        var start = i;
+        while (i < points.length && !isNaN(points[i].y)) i++;
+        if (i - start > 1) {
+          ctx.beginPath();
+          var p = worldToScreen(points[start].x, points[start].y);
+          ctx.moveTo(p.x, p.y);
+          for (var j = start + 1; j < i; j++) {
+            p = worldToScreen(points[j].x, points[j].y);
+            ctx.lineTo(p.x, p.y);
+          }
+          ctx.stroke();
+        }
+      }
+      
+      if (parsedData.points) {
+        parsedData.points.forEach(function(pt) {
+          var screen = worldToScreen(pt.x, pt.y);
+          ctx.beginPath();
+          ctx.arc(screen.x, screen.y, 5, 0, 2 * Math.PI);
+          ctx.fillStyle = pt.color || '#e74c3c';
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          if (pt.label) {
+            ctx.fillStyle = '#333';
+            ctx.font = '13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(pt.label, screen.x, screen.y - 8);
+          }
+        });
+      }
+      
+      if (parsedData.showEquation !== false) {
+        ctx.fillStyle = color;
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        var labelPos = worldToScreen(xMax * 0.7, evaluate(equation, xMax * 0.7));
+        if (isFinite(labelPos.y)) {
+          ctx.fillText('y = ' + equation, padding + 10, padding + 20);
+        }
+      }
+      
+    }, 100);
+    return funcHtml;
+  }
+  
+  // COORDINATE-PLANE
+  else if (parsedData.type === 'coordinate-plane') {
+    var coordCanvasId = 'coord_' + Math.random().toString(36).substr(2, 9);
+    var coordHtml = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;position:relative;">' +
+      '<canvas id="' + coordCanvasId + '" style="width:100%;height:400px;display:block;border-radius:4px;"></canvas>' +
+      '</div>';
+    
+    setTimeout(function() {
+      console.log("✅ coordinate-plane version 2026 - full support");
+      
+      var canvas = document.getElementById(coordCanvasId);
+      if (!canvas) {
+        console.error("❌ Canvas not found!");
+        return;
+      }
+      
+      var rect = canvas.parentElement.getBoundingClientRect();
+      var dpr = window.devicePixelRatio || 1;
+      var w = canvas.parentElement.clientWidth || 600;
+      var h = 400;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      
+      var ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      
+      var xMin = parsedData.xAxis?.min !== undefined ? parsedData.xAxis.min : -10;
+      var xMax = parsedData.xAxis?.max !== undefined ? parsedData.xAxis.max : 10;
+      var yMin = parsedData.yAxis?.min !== undefined ? parsedData.yAxis.min : -10;
+      var yMax = parsedData.yAxis?.max !== undefined ? parsedData.yAxis.max : 10;
+      
+      var padding = 40;
+      var graphW = w - padding * 2;
+      var graphH = h - padding * 2;
+      
+      function toScreen(px, py) {
+        var sx = padding + ((px - xMin) / (xMax - xMin)) * graphW;
+        var sy = padding + graphH - ((py - yMin) / (yMax - yMin)) * graphH;
+        return { x: sx, y: sy };
+      }
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      
+      if (parsedData.grid !== false) {
+        ctx.strokeStyle = '#f0f0f0';
+        ctx.lineWidth = 1;
+        var xTick = parsedData.xAxis?.tick || 1;
+        var yTick = parsedData.yAxis?.tick || 1;
+        for (var x = Math.ceil(xMin /
+
+
+// ========================================================================
 // BLOCK 1300: 문제 렌더링 (원본 B011 renderCurrentQuestion + renderSubjectiveQuestion + showExplanation)
 // ========================================================================
 
@@ -3070,6 +3902,9 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
   }
   DOM.prevBtn.disabled = (currentIndex === 0);
 }
+
+
+
 
 // ========================================================================
 // BLOCK 1320: showExplanation (원본 B011)
