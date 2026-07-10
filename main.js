@@ -1558,6 +1558,39 @@ function detectMathQuestion(q) {
 }
 
 // ========================================================================
+// BLOCK 1130: renderWithEditingMarks (Writing 편집 마크업)
+// ========================================================================
+function renderWithEditingMarks(text, isMath) {
+    if (!text) return text;
+    var html = text;
+    
+    // SAT Writing 편집 표시
+    html = html.replace(/\[u\](.*?)\[\/u\]/g, '<u>$1</u>');
+    html = html.replace(/\[s\](.*?)\[\/s\]/g, '<del>$1</del>');
+    html = html.replace(/\[i\](.*?)\[\/i\]/g, '<ins>$1</ins>');
+    html = html.replace(/\[b\](.*?)\[\/b\]/g, '<strong>$1</strong>');
+    html = html.replace(/\[em\](.*?)\[\/em\]/g, '<em>$1</em>');
+    html = html.replace(/\[underline\](.*?)\[\/underline\]/g,
+        '<span style="text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px;">$1</span>');
+    html = html.replace(/\[(\d+)\]/g,
+        '<sup style="color:#3498db;font-weight:bold;font-size:0.8em;">[$1]</sup>');
+    
+    // 수식이면 LaTeX 처리
+    if (isMath) {
+        var tagPlaceholders = [];
+        html = html.replace(/<[^>]+>/g, function(match) {
+            tagPlaceholders.push(match);
+            return '%%TAG' + (tagPlaceholders.length - 1) + '%%';
+        });
+        html = autoWrapLatex(html);
+        html = html.replace(/%%TAG(\d+)%%/g, function(match, idx) {
+            return tagPlaceholders[parseInt(idx)] || match;
+        });
+    }
+    return html;
+}
+
+// ========================================================================
 // BLOCK 1200: renderGraphic (원본 B014 완전 복구)
 // ========================================================================
 function renderGraphic(jsonData) {
@@ -3659,6 +3692,7 @@ window.getValidChoiceKeys = getValidChoiceKeys;
 window.randomizeChoicesOnly = randomizeChoicesOnly;
 window.autoWrapLatex = autoWrapLatex;
 window.detectMathQuestion = detectMathQuestion;
+window.renderWithEditingMarks = renderWithEditingMarks;  // ★ 추가!
 
 window.currentQuestions = currentQuestions;
 window.userAnswers = userAnswers;
