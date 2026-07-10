@@ -3576,14 +3576,14 @@ function initialize() {
 }
 
 // ========================================================================
-// BLOCK 1600: 내보내기 및 전역 노출 (수정 완료)
+// BLOCK 1600: 내보내기 및 전역 노출 (최종본)
 // ========================================================================
 
 // 1. 전역(window) 노출
 window.initialize = initialize;
 window.startQuizWithNumber = startQuizWithNumber;
 window.renderGraphic = renderGraphic;
-window.renderCurrentQuestion = renderCurrentQuestion;  // ★ 추가!
+window.renderCurrentQuestion = renderCurrentQuestion;
 window.showExplanation = showExplanation;
 window.goNext = goNext;
 window.goPrev = goPrev;
@@ -3608,7 +3608,7 @@ window.DOM = DOM;
 window.LOADER = LOADER;
 window.RendererManager = RendererManager;
 
-// ★★★★★ 8개 유틸리티 함수 전역 노출 ★★★★★
+// ★★★★★ 유틸리티 함수 전역 노출 ★★★★★
 window.escapeHtml = escapeHtml;
 window.getAnswerLetter = getAnswerLetter;
 window.hasRealChoices = hasRealChoices;
@@ -3616,7 +3616,7 @@ window.isSubjectiveQuestion = isSubjectiveQuestion;
 window.getValidChoiceKeys = getValidChoiceKeys;
 window.randomizeChoicesOnly = randomizeChoicesOnly;
 window.autoWrapLatex = autoWrapLatex;
-window.detectMathQuestion = detectMathQuestion;  // ★ 추가!
+window.detectMathQuestion = detectMathQuestion;
 
 window.currentQuestions = currentQuestions;
 window.userAnswers = userAnswers;
@@ -3652,6 +3652,7 @@ export {
   LOG,
   RendererManager
 };
+
 
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
