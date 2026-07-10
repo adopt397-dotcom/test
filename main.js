@@ -991,17 +991,52 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
     }
 }
 // ========================================================================
-// BLOCK 0800: hasRealChoices (수정본 - 더 엄격한 판단)
+// BLOCK 0800: 유틸리티 함수 (완전체)
 // ========================================================================
 
-// ★★★★★ hasRealChoices 함수 완전 교체 ★★★★★
+// ========================================================================
+// BLOCK 0810: escapeHtml
+// ========================================================================
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  if (typeof str !== 'string') str = String(str);
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
+
+// ========================================================================
+// BLOCK 0820: getAnswerLetter
+// ========================================================================
+function getAnswerLetter(num) {
+  var n = parseInt(num);
+  if (isNaN(n)) return num;
+  var letters = {1:'A',2:'B',3:'C',4:'D'};
+  return letters[n] || num;
+}
+
+// ========================================================================
+// BLOCK 0830: getValidChoiceKeys
+// ========================================================================
+function getValidChoiceKeys(choices) {
+  return Object.keys(choices).filter(function(key) {
+    var val = choices[key];
+    if (typeof val === 'string') return val && val.trim() !== "";
+    return val !== null && val !== undefined && val !== "";
+  }).sort(function(a, b) { return Number(a) - Number(b); });
+}
+
+// ========================================================================
+// BLOCK 0840: hasRealChoices (기존 코드 유지 + 추가 함수들과 통합)
+// ========================================================================
 function hasRealChoices(q) {
     if (!q || !q.choices) return false;
     
-    // 1. choices 객체가 비어있으면 false
     if (Object.keys(q.choices).length === 0) return false;
     
-    // 2. 모든 값이 비어있거나 "No options"이면 false
     var hasNonEmptyChoice = false;
     var choiceValues = Object.values(q.choices);
     for (var i = 0; i < choiceValues.length; i++) {
@@ -1020,21 +1055,17 @@ function hasRealChoices(q) {
     }
     if (!hasNonEmptyChoice) return false;
     
-    // 3. ★★★★★ 가장 중요한 조건: 객관식 문제인지 판단 ★★★★★
-    // 3-1. choices에 1~4 키가 있고 값이 있으면 객관식
     var has1 = q.choices['1'] && q.choices['1'].trim() !== '';
     var has2 = q.choices['2'] && q.choices['2'].trim() !== '';
     var has3 = q.choices['3'] && q.choices['3'].trim() !== '';
     var has4 = q.choices['4'] && q.choices['4'].trim() !== '';
     
-    // 3-2. 명시적으로 객관식으로 표시된 경우 (A, B, C, D 패턴)
     var hasLetterChoices = false;
     var choiceKeys = Object.keys(q.choices);
     for (var j = 0; j < choiceKeys.length; j++) {
         var key = choiceKeys[j];
         var val = q.choices[key];
         if (typeof val === 'string' && val.trim() !== '') {
-            // A) B) C) D) 패턴 또는 A. B. C. D. 패턴
             if (/^[A-Da-d][)\\.]/.test(val.trim())) {
                 hasLetterChoices = true;
                 break;
@@ -1042,12 +1073,10 @@ function hasRealChoices(q) {
         }
     }
     
-    // 3-3. 4개 이상의 선택지가 있으면 객관식으로 간주
     var choiceCount = Object.keys(q.choices).filter(function(k) {
         return q.choices[k] && q.choices[k].trim() !== '';
     }).length;
     
-    // 3-4. ★ 답변이 숫자이고 1~4 사이면 객관식
     var answerIsNumeric = false;
     if (q.answer) {
         var ansNum = parseInt(q.answer);
@@ -1056,13 +1085,11 @@ function hasRealChoices(q) {
         }
     }
     
-    // 종합 판단: 객관식 조건 충족 시 true 반환
     var isMultipleChoice = (has1 && has2 && has3 && has4) || 
                            hasLetterChoices || 
                            choiceCount >= 3 ||
                            (answerIsNumeric && choiceCount >= 2);
     
-    // 디버그 로그
     if (isMultipleChoice) {
         console.log('📋 객관식 감지:', {
             has1_2_3_4: has1 && has2 && has3 && has4,
@@ -1077,12 +1104,19 @@ function hasRealChoices(q) {
 }
 
 // ========================================================================
-// BLOCK 0810: randomizeChoicesOnly (선택지 랜덤화)
+// BLOCK 0850: isSubjectiveQuestion
+// ========================================================================
+function isSubjectiveQuestion(q) {
+  if (!q || !q.choices) return true;
+  return !hasRealChoices(q);
+}
+
+// ========================================================================
+// BLOCK 0860: randomizeChoicesOnly
 // ========================================================================
 function randomizeChoicesOnly(q) {
     if (!q || !q.choices) return q;
     if (!hasRealChoices(q)) return q;
-    
     try {
         var validEntries = Object.entries(q.choices).filter(function(item) {
             var k = item[0], v = item[1];
@@ -1092,9 +1126,7 @@ function randomizeChoicesOnly(q) {
             var k = item[0], v = item[1];
             return { k: parseInt(k), v: String(v) };
         });
-        
         if (validEntries.length === 0) return q;
-        
         var shuffled = validEntries.slice();
         for (var i = shuffled.length - 1; i > 0; i--) {
             var j = Math.floor(Math.random() * (i + 1));
@@ -1102,26 +1134,13 @@ function randomizeChoicesOnly(q) {
             shuffled[i] = shuffled[j];
             shuffled[j] = temp;
         }
-        
         var newChoices = {};
-        shuffled.forEach(function(c, idx) {
-            newChoices[idx + 1] = c.v;
-        });
-        
+        shuffled.forEach(function(c, idx) { newChoices[idx + 1] = c.v; });
         var originalAns = parseInt(q.answer);
         var correctIdx = shuffled.findIndex(function(c) { return c.k == originalAns; });
         var newAnswer = (correctIdx + 1).toString();
-        
-        // 정답이 유효하지 않으면 원본 유지
-        if (isNaN(correctIdx) || correctIdx < 0) {
-            return q;
-        }
-        
-        return {
-            ...q,
-            choices: newChoices,
-            answer: newAnswer
-        };
+        if (isNaN(correctIdx) || correctIdx < 0) return q;
+        return { ...q, choices: newChoices, answer: newAnswer };
     } catch(e) {
         console.error("Randomize error:", e);
         return q;
