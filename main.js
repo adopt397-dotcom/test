@@ -3653,20 +3653,10 @@ function initialize() {
 window.renderWithEditingMarks = renderWithEditingMarks;
 
 // ========================================================================
-// BLOCK 1600: 내보내기 및 전역 노출
+// BLOCK 1600: 내보내기 및 전역 노출 (최종본)
 // ========================================================================
 
 // 1. 전역(window) 노출
-window.TOTAL_QUESTIONS = TOTAL_QUESTIONS;
-window.currentQuestions = currentQuestions;
-window.userAnswers = userAnswers;
-window.currentIndex = currentIndex;
-window.correctCount = correctCount;
-window.isReviewMode = isReviewMode;
-window.currentStartNumber = currentStartNumber;
-window.masterQuestions = masterQuestions;
-window.originalQuestions = originalQuestions;
-
 window.initialize = initialize;
 window.startQuizWithNumber = startQuizWithNumber;
 window.renderGraphic = renderGraphic;
@@ -3705,6 +3695,17 @@ window.randomizeChoicesOnly = randomizeChoicesOnly;
 window.autoWrapLatex = autoWrapLatex;
 window.detectMathQuestion = detectMathQuestion;
 window.renderWithEditingMarks = renderWithEditingMarks;
+
+// ★★★★★ 전역 변수 노출 (이 부분이 누락됨!) ★★★★★
+window.TOTAL_QUESTIONS = TOTAL_QUESTIONS;
+window.currentQuestions = currentQuestions;
+window.userAnswers = userAnswers;
+window.currentIndex = currentIndex;
+window.correctCount = correctCount;
+window.isReviewMode = isReviewMode;
+window.currentStartNumber = currentStartNumber;
+window.masterQuestions = masterQuestions;
+window.originalQuestions = originalQuestions;
 
 // 2. ES Module Export
 export { 
