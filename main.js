@@ -3652,6 +3652,84 @@ function initialize() {
 
 window.renderWithEditingMarks = renderWithEditingMarks;
 
+// ========================================================================
+// BLOCK 1600: 내보내기 및 전역 노출 (최종본)
+// ========================================================================
+
+// 1. 전역(window) 노출
+window.initialize = initialize;
+window.startQuizWithNumber = startQuizWithNumber;
+window.renderGraphic = renderGraphic;
+window.renderCurrentQuestion = renderCurrentQuestion;
+window.showExplanation = showExplanation;
+window.goNext = goNext;
+window.goPrev = goPrev;
+window.skipQuestion = skipQuestion;
+window.submitSubjective = submitSubjective;
+window.showResults = showResults;
+window.showWrongAnswersList = showWrongAnswersList;
+window.startWrongOnlyReview = startWrongOnlyReview;
+window.saveProgress = saveProgress;
+window.loadProgress = loadProgress;
+window.clearProgress = clearProgress;
+window.attachEvents = attachEvents;
+window.ensureChartJS = ensureChartJS;
+window.ensureThreeJS = ensureThreeJS;
+window.ensureMathJax = ensureMathJax;
+window.ensureMathJS = ensureMathJS;
+window.loadAllLibrariesInBackground = loadAllLibrariesInBackground;
+window.showToast = showToast;
+window.LOG = LOG;
+window.LANG = LANG;
+window.DOM = DOM;
+window.LOADER = LOADER;
+window.RendererManager = RendererManager;
+
+// ★★★★★ 유틸리티 함수 전역 노출 ★★★★★
+window.escapeHtml = escapeHtml;
+window.getAnswerLetter = getAnswerLetter;
+window.hasRealChoices = hasRealChoices;
+window.isSubjectiveQuestion = isSubjectiveQuestion;
+window.getValidChoiceKeys = getValidChoiceKeys;
+window.randomizeChoicesOnly = randomizeChoicesOnly;
+window.autoWrapLatex = autoWrapLatex;
+window.detectMathQuestion = detectMathQuestion;
+window.renderWithEditingMarks = renderWithEditingMarks;  // ★ 추가
+
+window.currentQuestions = currentQuestions;
+window.userAnswers = userAnswers;
+window.currentIndex = currentIndex;
+window.correctCount = correctCount;
+window.isReviewMode = isReviewMode;
+window.currentStartNumber = currentStartNumber;
+window.TOTAL_QUESTIONS = TOTAL_QUESTIONS;
+
+// 2. ES Module Export
+export { 
+  initialize, 
+  startQuizWithNumber, 
+  renderGraphic,
+  renderCurrentQuestion,
+  showExplanation,
+  goNext,
+  goPrev,
+  skipQuestion,
+  submitSubjective,
+  showResults,
+  showWrongAnswersList,
+  startWrongOnlyReview,
+  saveProgress,
+  loadProgress,
+  clearProgress,
+  ensureChartJS,
+  ensureThreeJS,
+  ensureMathJax,
+  ensureMathJS,
+  loadAllLibrariesInBackground,
+  showToast,
+  LOG,
+  RendererManager
+};
 
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
