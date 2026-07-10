@@ -3616,7 +3616,7 @@ window.isSubjectiveQuestion = isSubjectiveQuestion;
 window.getValidChoiceKeys = getValidChoiceKeys;
 window.randomizeChoicesOnly = randomizeChoicesOnly;
 
-// ★★★★★ autoWrapLatex 전역 노출 (추가!) ★★★★★
+// ★★★★★ autoWrapLatex 전역 노출 (이 줄 추가!) ★★★★★
 window.autoWrapLatex = autoWrapLatex;
 
 window.currentQuestions = currentQuestions;
