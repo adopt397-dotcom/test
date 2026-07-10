@@ -2246,7 +2246,7 @@ function renderCoordinatePlane(parsedData) {
 }
 
 // ========================================================================
-// BLOCK 1260: 메인 renderGraphic 함수 (통합)
+// BLOCK 1260: 메인 renderGraphic 함수 (통합 - 모든 타입 지원)
 // ========================================================================
 function renderGraphic(jsonData) {
     if (!jsonData || jsonData.trim() == "") return "";
@@ -2268,15 +2268,35 @@ function renderGraphic(jsonData) {
     
     var type = parsedData.type || '';
     
-    // ★ 타입별 라우팅
+    // ★ 타입별 라우팅 (모든 타입 지원)
     switch(type) {
+        // === 도형/기하 타입 ===
         case 'graphic':
             return renderGraphicType(parsedData);
         case 'shape':
             return renderShapeType(parsedData);
+        
+        // === 함수/좌표평면 타입 ===
         case 'coordinate-plane':
             return renderCoordinatePlane(parsedData);
-        // 여기에 다른 타입들 추가 (bar, pie, line 등)
+        
+        // === 차트 타입 (Chart.js 기반) ===
+        case 'bar':
+        case 'pie':
+        case 'line':
+        case 'scatter':
+        case 'radar':
+        case 'stacked-bar':
+        case 'compare':
+        case 'histogram':
+        case 'dot-plot':
+            return renderChartType(parsedData);
+        
+        // === 테이블 타입 ===
+        case 'table':
+            return renderTableType(parsedData);
+        
+        // === 지원되지 않는 타입 ===
         default:
             return '<div style="padding:10px;text-align:center;color:#999;border:1px dashed #ddd;border-radius:8px;margin:15px 0;">' +
                 '<span style="font-size:20px;">📊</span>' +
@@ -2290,6 +2310,772 @@ function renderGraphic(jsonData) {
 // ========================================================================
 window.renderGraphic = renderGraphic;
 
+// ========================================================================
+// BLOCK 1280: table 타입 렌더러
+// ========================================================================
+function renderTableType(parsedData) {
+    if (!parsedData.headers || !parsedData.rows) {
+        return '<div style="padding:10px;color:#999;text-align:center;">📊 Invalid table data</div>';
+    }
+    
+    var h = '<div style="margin:15px 0;overflow-x:auto;background:white;border-radius:8px;border:1px solid #ddd;">' +
+        '<table style="width:100%;border-collapse:collapse;text-align:center;font-size:14px;">';
+    h += '<thead><tr style="background:#3498db;color:white;">';
+    parsedData.headers.forEach(function(hd) { 
+        h += '<th style="padding:10px 14px;border:1px solid #2980b9;font-weight:bold;">' + escapeHtml(hd) + '</th>'; 
+    });
+    h += '</tr></thead><tbody>';
+    parsedData.rows.forEach(function(row, ri) {
+        h += '<tr style="background:' + (ri%2===0?'#fff':'#f8f9fa') + ';">';
+        row.forEach(function(cell) { 
+            h += '<td style="padding:8px 14px;border:1px solid #ddd;">' + escapeHtml(cell) + '</td>'; 
+        });
+        h += '</tr>';
+    });
+    h += '</tbody></table>';
+    if (parsedData.title) {
+        h += '<div style="text-align:center;padding:8px;font-weight:bold;color:#555;background:#f8f9fa;border-radius:0 0 8px 8px;">' + escapeHtml(parsedData.title) + '</div>';
+    }
+    h += '</div>';
+    return h;
+}
+// ========================================================================
+// BLOCK 1290: chart 타입 렌더러 (Chart.js 기반 - bar, pie, line, scatter, dot-plot 등)
+// ========================================================================
+function renderChartType(parsedData) {
+    var type = parsedData.type || '';
+    var chartId = 'chart_' + Math.random().toString(36).substr(2, 9);
+    var html = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;">' +
+        '<canvas id="' + chartId + '" style="width:100%;height:400px;display:block;border-radius:4px;"></canvas>' +
+        '</div>';
+    
+    // Chart.js 로드 보장
+    if (typeof Chart === 'undefined') {
+        // Chart.js가 없으면 로드 시도
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+        script.onload = function() {
+            renderChartWithChartJS(parsedData, chartId);
+        };
+        document.head.appendChild(script);
+    } else {
+        setTimeout(function() {
+            renderChartWithChartJS(parsedData, chartId);
+        }, 50);
+    }
+    
+    return html;
+}
+
+// ========================================================================
+// BLOCK 1291: Chart.js 기반 렌더링 엔진
+// ========================================================================
+function renderChartWithChartJS(parsedData, chartId) {
+    var canvas = document.getElementById(chartId);
+    if (!canvas) return;
+    if (typeof Chart === 'undefined') {
+        canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">📊 Chart.js 로딩 중...</div>';
+        return;
+    }
+    
+    var ctx = canvas.getContext('2d');
+    var type = parsedData.type || '';
+    var config = null;
+    
+    // === BAR ===
+    if (type === 'bar') {
+        var labels = parsedData.labels || [];
+        var datasets = [];
+        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c'];
+        
+        if (parsedData.series && Array.isArray(parsedData.series)) {
+            datasets = parsedData.series.map(function(s, i) {
+                var color = colors[i % colors.length];
+                return {
+                    label: s.name || 'Series ' + (i+1),
+                    data: s.data || [],
+                    backgroundColor: color + '80',
+                    borderColor: color,
+                    borderWidth: 2
+                };
+            });
+        } else if (parsedData.values) {
+            datasets = [{
+                label: parsedData.label || 'Data',
+                data: parsedData.values,
+                backgroundColor: parsedData.color || '#3498db80',
+                borderColor: parsedData.stroke || '#3498db',
+                borderWidth: 2
+            }];
+        }
+        
+        config = {
+            type: 'bar',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Bar Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    x: { title: { display: true, text: parsedData.xAxis?.label || '' }, grid: { color: '#e0e0e0' } },
+                    y: { beginAtZero: true, title: { display: true, text: parsedData.yAxis?.label || '' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === PIE ===
+    else if (type === 'pie' && parsedData.labels && parsedData.values) {
+        config = {
+            type: 'pie',
+            data: {
+                labels: parsedData.labels,
+                datasets: [{
+                    data: parsedData.values,
+                    backgroundColor: parsedData.colors || ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Pie Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                }
+            }
+        };
+    }
+    
+    // === LINE ===
+    else if (type === 'line' && parsedData.series) {
+        var datasets = parsedData.series.map(function(s, i) {
+            var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
+            var color = s.color || colors[i % colors.length];
+            var points = s.points || [];
+            var data = points.map(function(p) { return { x: p.x, y: p.y }; });
+            
+            return {
+                label: s.name || 'Series ' + (i+1),
+                data: data,
+                borderColor: color,
+                backgroundColor: color + '20',
+                borderWidth: s.lineWidth || 3,
+                pointRadius: s.pointSize || 5,
+                tension: 0.3,
+                showLine: true,
+                fill: false
+            };
+        });
+        
+        config = {
+            type: 'scatter',
+            data: { datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Line Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    x: { type: 'linear', title: { display: true, text: parsedData.xAxis?.label || 'x' }, grid: { color: '#e0e0e0' } },
+                    y: { title: { display: true, text: parsedData.yAxis?.label || 'y' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === SCATTER ===
+    else if (type === 'scatter' && parsedData.points) {
+        var dataPoints = parsedData.points.map(function(p) {
+            return { x: p.x, y: p.y };
+        });
+        
+        config = {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: parsedData.title || 'Scatterplot',
+                    data: dataPoints,
+                    backgroundColor: '#3498db',
+                    borderColor: '#2980b9',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Scatter Plot', font: { size: 16, weight: 'bold' } },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { title: { display: true, text: parsedData.xAxis?.label || 'x' }, grid: { color: '#e0e0e0' } },
+                    y: { title: { display: true, text: parsedData.yAxis?.label || 'y' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+        
+        // 회귀선 (equation이 있으면)
+        if (parsedData.equation) {
+            // annotation plugin 없이 간단히 선 추가는 생략
+            // 대신 scatter 포인트만 표시
+        }
+    }
+    
+    // === DOT-PLOT ===
+    else if (type === 'dot-plot' && parsedData.data) {
+        var labels = parsedData.data.map(function(d) { return d.value; });
+        var values = parsedData.data.map(function(d) { return d.count; });
+        
+        config = {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: parsedData.title || 'Frequency',
+                    data: values,
+                    backgroundColor: '#3498db80',
+                    borderColor: '#2c3e50',
+                    borderWidth: 1,
+                    barPercentage: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Dot Plot', font: { size: 16, weight: 'bold' } },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { title: { display: true, text: parsedData.xAxis?.label || 'Value' }, grid: { color: '#e0e0e0' } },
+                    y: { beginAtZero: true, title: { display: true, text: parsedData.yAxis?.label || 'Count' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === STACKED-BAR ===
+    else if (type === 'stacked-bar' && parsedData.labels && parsedData.datasets) {
+        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
+        var datasets = parsedData.datasets.map(function(ds, i) {
+            var color = colors[i % colors.length];
+            return {
+                label: ds.label || 'Series ' + (i+1),
+                data: ds.values || [],
+                backgroundColor: color + '80',
+                borderColor: color,
+                borderWidth: 1
+            };
+        });
+        
+        config = {
+            type: 'bar',
+            data: {
+                labels: parsedData.labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Stacked Bar Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    x: { stacked: true, grid: { color: '#e0e0e0' } },
+                    y: { stacked: true, beginAtZero: true, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === RADAR ===
+    else if (type === 'radar' && parsedData.labels && parsedData.datasets) {
+        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
+        var datasets = parsedData.datasets.map(function(ds, i) {
+            var color = colors[i % colors.length];
+            return {
+                label: ds.label || 'Series ' + (i+1),
+                data: ds.values || [],
+                borderColor: color,
+                backgroundColor: color + '20',
+                borderWidth: 2,
+                pointRadius: 4
+            };
+        });
+        
+        config = {
+            type: 'radar',
+            data: {
+                labels: parsedData.labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Radar Chart', font: { size: 16, weight: 'bold' } }
+                },
+                scales: {
+                    r: { beginAtZero: true, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === COMPARE ===
+    else if (type === 'compare' && parsedData.graphs) {
+        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
+        var datasets = parsedData.graphs.map(function(g, i) {
+            var color = colors[i % colors.length];
+            var data = (g.points || []).map(function(p) {
+                return { x: p.x || 0, y: p.y || 0 };
+            });
+            return {
+                label: g.label || 'Series ' + (i+1),
+                data: data,
+                borderColor: color,
+                backgroundColor: color + '20',
+                pointRadius: 4,
+                pointBackgroundColor: color,
+                tension: 0.3,
+                showLine: true,
+                fill: false
+            };
+        });
+        
+        config = {
+            type: 'scatter',
+            data: { datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Comparison Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    x: { type: 'linear', title: { display: true, text: parsedData.xAxis?.label || 'x' }, grid: { color: '#e0e0e0' } },
+                    y: { title: { display: true, text: parsedData.yAxis?.label || 'y' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === HISTOGRAM ===
+    else if (type === 'histogram' && parsedData.bins && parsedData.counts) {
+        config = {
+            type: 'bar',
+            data: {
+                labels: parsedData.bins,
+                datasets: [{
+                    label: parsedData.title || 'Frequency',
+                    data: parsedData.counts,
+                    backgroundColor: 'rgba(52,152,219,0.7)',
+                    borderColor: '#2c3e50',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Histogram', font: { size: 16, weight: 'bold' } },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { title: { display: true, text: parsedData.xLabel || '' }, grid: { color: '#e0e0e0' } },
+                    y: { beginAtZero: true, title: { display: true, text: parsedData.yLabel || 'Frequency' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    if (config) {
+        try {
+            var chart = new Chart(ctx, config);
+            RendererManager.registerChart(chart);
+        } catch(e) {
+            console.error('Chart rendering error:', e);
+            canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#e74c3c;">📊 차트 렌더링 오류</div>';
+        }
+    }
+}
+
+// ========================================================================
+// BLOCK 1290: chart 타입 렌더러 (Chart.js 기반 - bar, pie, line, scatter, dot-plot 등)
+// ========================================================================
+function renderChartType(parsedData) {
+    var type = parsedData.type || '';
+    var chartId = 'chart_' + Math.random().toString(36).substr(2, 9);
+    var html = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;">' +
+        '<canvas id="' + chartId + '" style="width:100%;height:400px;display:block;border-radius:4px;"></canvas>' +
+        '</div>';
+    
+    // Chart.js 로드 보장
+    if (typeof Chart === 'undefined') {
+        // Chart.js가 없으면 로드 시도
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+        script.onload = function() {
+            renderChartWithChartJS(parsedData, chartId);
+        };
+        document.head.appendChild(script);
+    } else {
+        setTimeout(function() {
+            renderChartWithChartJS(parsedData, chartId);
+        }, 50);
+    }
+    
+    return html;
+}
+
+// ========================================================================
+// BLOCK 1291: Chart.js 기반 렌더링 엔진
+// ========================================================================
+function renderChartWithChartJS(parsedData, chartId) {
+    var canvas = document.getElementById(chartId);
+    if (!canvas) return;
+    if (typeof Chart === 'undefined') {
+        canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">📊 Chart.js 로딩 중...</div>';
+        return;
+    }
+    
+    var ctx = canvas.getContext('2d');
+    var type = parsedData.type || '';
+    var config = null;
+    
+    // === BAR ===
+    if (type === 'bar') {
+        var labels = parsedData.labels || [];
+        var datasets = [];
+        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c'];
+        
+        if (parsedData.series && Array.isArray(parsedData.series)) {
+            datasets = parsedData.series.map(function(s, i) {
+                var color = colors[i % colors.length];
+                return {
+                    label: s.name || 'Series ' + (i+1),
+                    data: s.data || [],
+                    backgroundColor: color + '80',
+                    borderColor: color,
+                    borderWidth: 2
+                };
+            });
+        } else if (parsedData.values) {
+            datasets = [{
+                label: parsedData.label || 'Data',
+                data: parsedData.values,
+                backgroundColor: parsedData.color || '#3498db80',
+                borderColor: parsedData.stroke || '#3498db',
+                borderWidth: 2
+            }];
+        }
+        
+        config = {
+            type: 'bar',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Bar Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    x: { title: { display: true, text: parsedData.xAxis?.label || '' }, grid: { color: '#e0e0e0' } },
+                    y: { beginAtZero: true, title: { display: true, text: parsedData.yAxis?.label || '' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === PIE ===
+    else if (type === 'pie' && parsedData.labels && parsedData.values) {
+        config = {
+            type: 'pie',
+            data: {
+                labels: parsedData.labels,
+                datasets: [{
+                    data: parsedData.values,
+                    backgroundColor: parsedData.colors || ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Pie Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                }
+            }
+        };
+    }
+    
+    // === LINE ===
+    else if (type === 'line' && parsedData.series) {
+        var datasets = parsedData.series.map(function(s, i) {
+            var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
+            var color = s.color || colors[i % colors.length];
+            var points = s.points || [];
+            var data = points.map(function(p) { return { x: p.x, y: p.y }; });
+            
+            return {
+                label: s.name || 'Series ' + (i+1),
+                data: data,
+                borderColor: color,
+                backgroundColor: color + '20',
+                borderWidth: s.lineWidth || 3,
+                pointRadius: s.pointSize || 5,
+                tension: 0.3,
+                showLine: true,
+                fill: false
+            };
+        });
+        
+        config = {
+            type: 'scatter',
+            data: { datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Line Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    x: { type: 'linear', title: { display: true, text: parsedData.xAxis?.label || 'x' }, grid: { color: '#e0e0e0' } },
+                    y: { title: { display: true, text: parsedData.yAxis?.label || 'y' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === SCATTER ===
+    else if (type === 'scatter' && parsedData.points) {
+        var dataPoints = parsedData.points.map(function(p) {
+            return { x: p.x, y: p.y };
+        });
+        
+        config = {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: parsedData.title || 'Scatterplot',
+                    data: dataPoints,
+                    backgroundColor: '#3498db',
+                    borderColor: '#2980b9',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Scatter Plot', font: { size: 16, weight: 'bold' } },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { title: { display: true, text: parsedData.xAxis?.label || 'x' }, grid: { color: '#e0e0e0' } },
+                    y: { title: { display: true, text: parsedData.yAxis?.label || 'y' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+        
+        // 회귀선 (equation이 있으면)
+        if (parsedData.equation) {
+            // annotation plugin 없이 간단히 선 추가는 생략
+            // 대신 scatter 포인트만 표시
+        }
+    }
+    
+    // === DOT-PLOT ===
+    else if (type === 'dot-plot' && parsedData.data) {
+        var labels = parsedData.data.map(function(d) { return d.value; });
+        var values = parsedData.data.map(function(d) { return d.count; });
+        
+        config = {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: parsedData.title || 'Frequency',
+                    data: values,
+                    backgroundColor: '#3498db80',
+                    borderColor: '#2c3e50',
+                    borderWidth: 1,
+                    barPercentage: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Dot Plot', font: { size: 16, weight: 'bold' } },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { title: { display: true, text: parsedData.xAxis?.label || 'Value' }, grid: { color: '#e0e0e0' } },
+                    y: { beginAtZero: true, title: { display: true, text: parsedData.yAxis?.label || 'Count' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === STACKED-BAR ===
+    else if (type === 'stacked-bar' && parsedData.labels && parsedData.datasets) {
+        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
+        var datasets = parsedData.datasets.map(function(ds, i) {
+            var color = colors[i % colors.length];
+            return {
+                label: ds.label || 'Series ' + (i+1),
+                data: ds.values || [],
+                backgroundColor: color + '80',
+                borderColor: color,
+                borderWidth: 1
+            };
+        });
+        
+        config = {
+            type: 'bar',
+            data: {
+                labels: parsedData.labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Stacked Bar Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    x: { stacked: true, grid: { color: '#e0e0e0' } },
+                    y: { stacked: true, beginAtZero: true, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === RADAR ===
+    else if (type === 'radar' && parsedData.labels && parsedData.datasets) {
+        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
+        var datasets = parsedData.datasets.map(function(ds, i) {
+            var color = colors[i % colors.length];
+            return {
+                label: ds.label || 'Series ' + (i+1),
+                data: ds.values || [],
+                borderColor: color,
+                backgroundColor: color + '20',
+                borderWidth: 2,
+                pointRadius: 4
+            };
+        });
+        
+        config = {
+            type: 'radar',
+            data: {
+                labels: parsedData.labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Radar Chart', font: { size: 16, weight: 'bold' } }
+                },
+                scales: {
+                    r: { beginAtZero: true, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === COMPARE ===
+    else if (type === 'compare' && parsedData.graphs) {
+        var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6'];
+        var datasets = parsedData.graphs.map(function(g, i) {
+            var color = colors[i % colors.length];
+            var data = (g.points || []).map(function(p) {
+                return { x: p.x || 0, y: p.y || 0 };
+            });
+            return {
+                label: g.label || 'Series ' + (i+1),
+                data: data,
+                borderColor: color,
+                backgroundColor: color + '20',
+                pointRadius: 4,
+                pointBackgroundColor: color,
+                tension: 0.3,
+                showLine: true,
+                fill: false
+            };
+        });
+        
+        config = {
+            type: 'scatter',
+            data: { datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Comparison Chart', font: { size: 16, weight: 'bold' } },
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    x: { type: 'linear', title: { display: true, text: parsedData.xAxis?.label || 'x' }, grid: { color: '#e0e0e0' } },
+                    y: { title: { display: true, text: parsedData.yAxis?.label || 'y' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    // === HISTOGRAM ===
+    else if (type === 'histogram' && parsedData.bins && parsedData.counts) {
+        config = {
+            type: 'bar',
+            data: {
+                labels: parsedData.bins,
+                datasets: [{
+                    label: parsedData.title || 'Frequency',
+                    data: parsedData.counts,
+                    backgroundColor: 'rgba(52,152,219,0.7)',
+                    borderColor: '#2c3e50',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: parsedData.title || 'Histogram', font: { size: 16, weight: 'bold' } },
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { title: { display: true, text: parsedData.xLabel || '' }, grid: { color: '#e0e0e0' } },
+                    y: { beginAtZero: true, title: { display: true, text: parsedData.yLabel || 'Frequency' }, grid: { color: '#e0e0e0' } }
+                }
+            }
+        };
+    }
+    
+    if (config) {
+        try {
+            var chart = new Chart(ctx, config);
+            RendererManager.registerChart(chart);
+        } catch(e) {
+            console.error('Chart rendering error:', e);
+            canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#e74c3c;">📊 차트 렌더링 오류</div>';
+        }
+    }
+}
 
 // ========================================================================
 // BLOCK 1300: 문제 렌더링 (원본 B011 renderCurrentQuestion + renderSubjectiveQuestion + showExplanation)
