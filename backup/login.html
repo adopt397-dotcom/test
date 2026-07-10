@@ -6,9 +6,7 @@
     <title>GongBoo.org - Member Login</title>
 
 <!-- ====================================================================== -->
-<!-- HTML-0100: CSS 스타일 (대분류) -->
-<!-- ====================================================================== -->
-<!-- 🔍 찾기: HTML-0100 -->
+<!-- HTML-0100: CSS 스타일 -->
 <!-- ====================================================================== -->
 <style>
     * {
@@ -211,48 +209,41 @@
     <div class="container">
 
         <!-- ====================================================================== -->
-        <!-- HTML-0200: 헤더/로고 (대분류) -->
-        <!-- ====================================================================== -->
-        <!-- 🔍 찾기: HTML-0200 -->
+        <!-- HTML-0200: 헤더/로고 -->
         <!-- ====================================================================== -->
         <h1>GongBoo.org</h1>
         <p class="subtitle">Member Service</p>
 
-       <!-- ====================================================================== -->
-<!-- HTML-0300: 탭 메뉴 (대분류) -->
-<!-- ====================================================================== -->
-<!-- 🔍 찾기: HTML-0300 -->
-<!-- ====================================================================== -->
-<div class="tabs">
-    <button class="tab-btn active" data-tab="signupTab">Sign Up</button>
-    <button class="tab-btn" data-tab="changeTab">Change Password</button>
-</div>
-
-<!-- ====================================================================== -->
-<!-- HTML-0310: 로그인 폼 (중분류) -->
-<!-- ====================================================================== -->
-<!-- 🔍 찾기: HTML-0310 -->
-<!-- ====================================================================== -->
-<div id="loginTab" class="tab-content">
-    <div class="form-group">
-        <label>E-mail</label>
-        <input id="loginEmail" type="email" placeholder="example@email.com" />
-    </div>
-    <div class="form-group">
-        <label>Password</label>
-        <div class="password-wrapper">
-            <input id="loginPassword" type="password" placeholder="Enter your password" />
-            <span class="toggle-password" id="toggleLoginPassword">👁️</span>
+        <!-- ====================================================================== -->
+        <!-- HTML-0300: 탭 메뉴 (Login 버튼 추가) -->
+        <!-- ====================================================================== -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="loginTab">Login</button>
+            <button class="tab-btn" data-tab="signupTab">Sign Up</button>
+            <button class="tab-btn" data-tab="changeTab">Change Password</button>
         </div>
-    </div>
-    <button class="btn-primary" id="testLoginBtn">Login</button>
-    <div id="loginResult" class="result-box"></div>
-</div>
 
         <!-- ====================================================================== -->
-        <!-- HTML-0320: 회원가입 폼 (중분류) -->
+        <!-- HTML-0310: 로그인 폼 -->
         <!-- ====================================================================== -->
-        <!-- 🔍 찾기: HTML-0320 -->
+        <div id="loginTab" class="tab-content">
+            <div class="form-group">
+                <label>E-mail</label>
+                <input id="loginEmail" type="email" placeholder="example@email.com" />
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <div class="password-wrapper">
+                    <input id="loginPassword" type="password" placeholder="Enter your password" />
+                    <span class="toggle-password" id="toggleLoginPassword">👁️</span>
+                </div>
+            </div>
+            <button class="btn-primary" id="testLoginBtn">Login</button>
+            <div id="loginResult" class="result-box"></div>
+        </div>
+
+        <!-- ====================================================================== -->
+        <!-- HTML-0320: 회원가입 폼 -->
         <!-- ====================================================================== -->
         <div id="signupTab" class="tab-content form-hidden">
             <div class="form-group">
@@ -283,16 +274,11 @@
             </div>
             <button class="btn-primary btn-signup" id="testSignupBtn">Sign Up</button>
             <div id="signupResult" class="result-box">Waiting for sign up.</div>
-            <div class="toggle-text">
-                Already have an account?
-                <button class="link-btn" id="gotoLoginFromSignup">Sign In</button>
-            </div>
+            <!-- 하단 "Already have an account? Sign In" 링크 삭제됨 -->
         </div>
 
         <!-- ====================================================================== -->
-        <!-- HTML-0330: 상태 확인 (숨김) (중분류) -->
-        <!-- ====================================================================== -->
-        <!-- 🔍 찾기: HTML-0330 -->
+        <!-- HTML-0330: 상태 확인 (숨김) -->
         <!-- ====================================================================== -->
         <div style="display:none;">
             <button id="testStatusBtn">Check Status</button>
@@ -300,9 +286,7 @@
         </div>
 
         <!-- ====================================================================== -->
-        <!-- HTML-0340: 비밀번호 변경 폼 (중분류) -->
-        <!-- ====================================================================== -->
-        <!-- 🔍 찾기: HTML-0340 -->
+        <!-- HTML-0340: 비밀번호 변경 폼 -->
         <!-- ====================================================================== -->
         <div id="changeTab" class="tab-content form-hidden">
             <div class="form-group">
@@ -340,21 +324,15 @@
     </div>
 
     <!-- ====================================================================== -->
-    <!-- HTML-0400: JavaScript 전체 (대분류) -->
-    <!-- ====================================================================== -->
-    <!-- 🔍 찾기: HTML-0400 -->
+    <!-- HTML-0400: JavaScript 전체 -->
     <!-- ====================================================================== -->
 
-    <!-- ============================== -->
-    <!-- JS-0410: GAS_URL 설정 (소분류) -->
-    <!-- ============================== -->
+    <!-- JS-0410: GAS_URL 설정 -->
     <script>
         const GAS_URL = 'https://script.google.com/macros/s/AKfycbxadHBMhdMmUPgRvq_V-e7J9hnZFKgrkzqN2-MQ1jbqghaQXNAXIod7tH4BNm3R6o5h/exec';
     </script>
 
-    <!-- ============================== -->
-    <!-- JS-0420: 공통 함수 (소분류) -->
-    <!-- ============================== -->
+    <!-- JS-0420: 공통 함수 -->
     <script>
         function showResult(elementId, message, isSuccess) {
             const el = document.getElementById(elementId);
@@ -363,9 +341,7 @@
         }
     </script>
 
-    <!-- ============================== -->
-    <!-- JS-0430: 비밀번호 토글 (소분류) -->
-    <!-- ============================== -->
+    <!-- JS-0430: 비밀번호 토글 -->
     <script>
         function togglePasswordVisibility(inputId, toggleId) {
             const input = document.getElementById(inputId);
@@ -384,9 +360,7 @@
         }
     </script>
 
-    <!-- ============================== -->
-    <!-- JS-0440: 탭 전환 (소분류) -->
-    <!-- ============================== -->
+    <!-- JS-0440: 탭 전환 -->
     <script>
         function initTabs() {
             const tabs = document.querySelectorAll('.tab-btn');
@@ -406,15 +380,8 @@
                 });
             });
 
-            const gotoLoginFromSignup = document.getElementById('gotoLoginFromSignup');
+            // 하단 링크는 삭제되었으므로 gotoLoginFromSignup 관련 코드 제거
             const gotoLoginFromChange = document.getElementById('gotoLoginFromChange');
-
-            if (gotoLoginFromSignup) {
-                gotoLoginFromSignup.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    document.querySelector('[data-tab="loginTab"]').click();
-                });
-            }
             if (gotoLoginFromChange) {
                 gotoLoginFromChange.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -424,11 +391,7 @@
         }
     </script>
 
-    <!-- ============================== -->
-    <!-- JS-0450: 로그인 처리 (소분류) -->
-    <!-- ============================== -->
-    <!-- 🔍 찾기: JS-0450 -->
-    <!-- ============================== -->
+    <!-- JS-0450: 로그인 처리 -->
     <script>
         document.getElementById('testLoginBtn').addEventListener('click', async function() {
             const email = document.getElementById('loginEmail').value.trim();
@@ -451,11 +414,19 @@
 
                 if (data.success) {
                     showResult('loginResult', `✅ Welcome, ${data.name}!`, true);
-                    // 로그인 성공 시 SAT 퀴즈 페이지로 이동
-         window.location.href = 'https://gongboo.tilda.ws/login2';
-                
+                    // 🔥 로그인 성공 시 SAT 퀴즈 페이지로 이동 (Tilda 제거)
+                    window.location.href = './index.html';
                 } else {
-                    showResult('loginResult', `❌ ${data.message}`, false);
+                    // 🔥 payment_status별 메시지 표시
+                    let msg = data.message;
+                    if (data.status === 'pending') {
+                        msg = '⏳ ' + msg;
+                    } else if (data.status === 'expired') {
+                        msg = '⏰ ' + msg;
+                    } else if (data.status === 'none') {
+                        msg = '💳 ' + msg;
+                    }
+                    showResult('loginResult', '❌ ' + msg, false);
                 }
             } catch (err) {
                 showResult('loginResult', '❌ Server connection error: ' + err.message, false);
@@ -463,9 +434,7 @@
         });
     </script>
 
-    <!-- ============================== -->
-    <!-- JS-0460: 회원가입 처리 (소분류) -->
-    <!-- ============================== -->
+    <!-- JS-0460: 회원가입 처리 (자동 로그인 탭 전환 + 이메일 입력) -->
     <script>
         document.getElementById('testSignupBtn').addEventListener('click', async function() {
             const email = document.getElementById('signupEmail').value.trim();
@@ -500,16 +469,28 @@
                     body: JSON.stringify({ action: 'signup', email, pin: password, name, pn: phone })
                 });
                 const data = await response.json();
-                showResult('signupResult', data.success ? '✅ ' + data.message : '❌ ' + data.message, data.success);
+
+                if (data.success) {
+                    showResult('signupResult', '✅ ' + data.message, true);
+                    // 🔥 회원가입 성공 시 Login 탭으로 자동 전환 + 이메일 자동 입력
+                    const loginTab = document.querySelector('[data-tab="loginTab"]');
+                    if (loginTab) {
+                        loginTab.click();
+                        document.getElementById('loginEmail').value = email;
+                    } else {
+                        // loginTab이 없으면 login.html로 이동 (방어 코드)
+                        window.location.href = './login.html';
+                    }
+                } else {
+                    showResult('signupResult', '❌ ' + data.message, false);
+                }
             } catch (err) {
                 showResult('signupResult', '❌ Server connection error: ' + err.message, false);
             }
         });
     </script>
 
-    <!-- ============================== -->
-    <!-- JS-0470: 상태확인 (소분류) -->
-    <!-- ============================== -->
+    <!-- JS-0470: 상태확인 -->
     <script>
         document.getElementById('testStatusBtn').addEventListener('click', async function() {
             showResult('statusResult', '⏳ Checking...', false);
@@ -523,9 +504,7 @@
         });
     </script>
 
-    <!-- ============================== -->
-    <!-- JS-0480: 비밀번호 변경 처리 (소분류) -->
-    <!-- ============================== -->
+    <!-- JS-0480: 비밀번호 변경 처리 -->
     <script>
         document.getElementById('testChangePasswordBtn').addEventListener('click', async function() {
             const email = document.getElementById('changeEmail').value.trim();
@@ -555,17 +534,14 @@
                     body: JSON.stringify({ action: 'changePassword', email, oldPassword, newPassword })
                 });
                 const data = await response.json();
-                showResult('changePasswordResult', data.success ? '✅ ' + data.message : '❌ ' + data.message, data
-                .success);
+                showResult('changePasswordResult', data.success ? '✅ ' + data.message : '❌ ' + data.message, data.success);
             } catch (err) {
                 showResult('changePasswordResult', '❌ Server connection error: ' + err.message, false);
             }
         });
     </script>
 
-    <!-- ============================== -->
-    <!-- JS-0490: 초기화 (소분류) -->
-    <!-- ============================== -->
+    <!-- JS-0490: 초기화 -->
     <script>
         window.onload = function() {
             initTabs();
