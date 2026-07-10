@@ -774,7 +774,7 @@ async function detectTotalQuestions() {
 }
 
 // ========================================================================
-// BLOCK 0710: load50Questions (원본 B007 + Exponential Backoff + AbortController)
+// BLOCK 0710: load50Questions (수정본 - choices 처리 강화)
 // ========================================================================
 let currentAbortController = null;
 
@@ -857,12 +857,54 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 var questionText = parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx);
                 var passageText = parsed.passage || parsed.P || parsed.p || parsed.지문 || '';
                 
+                // ★★★★★ choices 처리 강화 ★★★★★
+                // 1. 명시적 choices 객체 확인
                 var choices = {};
-                choices['1'] = parsed['1'] || '';
-                choices['2'] = parsed['2'] || '';
-                choices['3'] = parsed['3'] || '';
-                choices['4'] = parsed['4'] || '';
+                var hasAnyChoice = false;
                 
+                // 2. parsed['1'], parsed['2'], parsed['3'], parsed['4'] 확인
+                for (var ci = 1; ci <= 4; ci++) {
+                    var key = String(ci);
+                    var val = parsed[key];
+                    // 값이 있으면 choices에 추가
+                    if (val !== undefined && val !== null && val !== '') {
+                        choices[key] = String(val);
+                        hasAnyChoice = true;
+                    }
+                }
+                
+                // 3. parsed.options 배열 확인
+                if (!hasAnyChoice && parsed.options && Array.isArray(parsed.options)) {
+                    for (var oi = 0; oi < parsed.options.length && oi < 4; oi++) {
+                        var opt = parsed.options[oi];
+                        if (opt !== undefined && opt !== null && opt !== '') {
+                            choices[String(oi + 1)] = String(opt);
+                            hasAnyChoice = true;
+                        }
+                    }
+                }
+                
+                // 4. parsed.choices 객체 확인
+                if (!hasAnyChoice && parsed.choices && typeof parsed.choices === 'object') {
+                    var choiceKeys = Object.keys(parsed.choices);
+                    for (var ck = 0; ck < choiceKeys.length; ck++) {
+                        var key = choiceKeys[ck];
+                        var val = parsed.choices[key];
+                        if (val !== undefined && val !== null && val !== '') {
+                            choices[key] = String(val);
+                            hasAnyChoice = true;
+                        }
+                    }
+                }
+                
+                // 5. 선택지가 없으면 기본값 채우기 (주관식 방지)
+                if (!hasAnyChoice) {
+                    // 객관식 데이터인데 빈 값이면 기본 선택지 추가
+                    choices = { '1': 'Option A', '2': 'Option B', '3': 'Option C', '4': 'Option D' };
+                    console.warn('⚠️ No choices found for question ' + idx + ', using defaults');
+                }
+                
+                // ★★★★★ 정답 처리 ★★★★★
                 var finalAnswer = '1';
                 if (parsed.A !== undefined && parsed.A !== null && parsed.A !== "") {
                     finalAnswer = String(parsed.A).trim();
@@ -872,6 +914,13 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     finalAnswer = String(parsed.정답).trim();
                 } else if (parsed.a !== undefined && parsed.a !== null && parsed.a !== "") {
                     finalAnswer = String(parsed.a).trim();
+                }
+                
+                // 정답이 choices에 없으면 첫 번째 선택지로 설정
+                if (!choices[finalAnswer] && hasAnyChoice) {
+                    var firstKey = Object.keys(choices)[0] || '1';
+                    finalAnswer = firstKey;
+                    console.warn('⚠️ Answer not in choices, using first: ' + firstKey);
                 }
                 
                 var originalNumber = parsed.N || parsed.originalNumber || parsed.n || (uiStartNumber + idx);
@@ -890,6 +939,8 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 
                 if (idx === 0) {
                     console.log('📝 First question mapped:', processed[0]);
+                    console.log('📝 Choices:', choices);
+                    console.log('📝 Answer:', finalAnswer);
                 }
             } catch(e) {
                 console.warn('⚠️ Parse error for item', idx, ':', e);
@@ -923,80 +974,89 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
 }
 
 // ========================================================================
-// BLOCK 0800: 유틸리티 함수 (원본 B004)
+// BLOCK 0800: hasRealChoices (수정본 - 더 엄격한 판단)
 // ========================================================================
-function escapeHtml(str) {
-  if (str === null || str === undefined) return "";
-  if (typeof str !== 'string') str = String(str);
-  return str.replace(/[&<>]/g, function(m) {
-    if (m === '&') return '&amp;';
-    if (m === '<') return '&lt;';
-    if (m === '>') return '&gt;';
-    return m;
-  });
-}
 
-function getAnswerLetter(num) {
-  var n = parseInt(num);
-  if (isNaN(n)) return num;
-  var letters = {1:'A',2:'B',3:'C',4:'D'};
-  return letters[n] || num;
-}
-
-function getValidChoiceKeys(choices) {
-  return Object.keys(choices).filter(function(key) {
-    var val = choices[key];
-    if (typeof val === 'string') return val && val.trim() !== "";
-    return val !== null && val !== undefined && val !== "";
-  }).sort(function(a, b) { return Number(a) - Number(b); });
-}
-
+// ★★★★★ hasRealChoices 함수 완전 교체 ★★★★★
 function hasRealChoices(q) {
-  if (!q || !q.choices) return false;
-  return Object.values(q.choices).some(function(v) {
-    if (!v || typeof v !== 'string') return false;
-    var trimmed = v.trim();
-    return trimmed !== "" && trimmed.toLowerCase() !== 'no options' && trimmed.toLowerCase() !== 'no options.' && trimmed !== 'No options';
-  });
-}
-
-function isSubjectiveQuestion(q) {
-  if (!q || !q.choices) return true;
-  return !hasRealChoices(q);
-}
-
-function randomizeChoicesOnly(q) {
-  if (!q || !q.choices) return q;
-  if (!hasRealChoices(q)) return q;
-  try {
-    var validEntries = Object.entries(q.choices).filter(function(item) {
-      var k = item[0], v = item[1];
-      if (typeof v === 'string') return v && v.trim() !== "";
-      return v !== null && v !== undefined && v !== "";
-    }).map(function(item) {
-      var k = item[0], v = item[1];
-      return { k: parseInt(k), v: String(v) };
-    });
-    var shuffled = validEntries.slice();
-    for (var i = shuffled.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var temp = shuffled[i];
-      shuffled[i] = shuffled[j];
-      shuffled[j] = temp;
+    if (!q || !q.choices) return false;
+    
+    // 1. choices 객체가 비어있으면 false
+    if (Object.keys(q.choices).length === 0) return false;
+    
+    // 2. 모든 값이 비어있거나 "No options"이면 false
+    var hasNonEmptyChoice = false;
+    var choiceValues = Object.values(q.choices);
+    for (var i = 0; i < choiceValues.length; i++) {
+        var v = choiceValues[i];
+        if (typeof v !== 'string') v = String(v);
+        var trimmed = v.trim();
+        if (trimmed !== "" && 
+            trimmed.toLowerCase() !== 'no options' && 
+            trimmed.toLowerCase() !== 'no options.' && 
+            trimmed !== 'No options' &&
+            trimmed !== 'none' &&
+            trimmed !== 'N/A') {
+            hasNonEmptyChoice = true;
+            break;
+        }
     }
-    var newChoices = {};
-    shuffled.forEach(function(c, idx) { newChoices[idx + 1] = c.v; });
-    var originalAns = parseInt(q.answer);
-    var correctIdx = shuffled.findIndex(function(c) { return c.k == originalAns; });
-    return {
-      ...q,
-      choices: newChoices,
-      answer: (correctIdx + 1).toString()
-    };
-  } catch(e) {
-    console.error("Randomize error:", e);
-    return q;
-  }
+    if (!hasNonEmptyChoice) return false;
+    
+    // 3. ★★★★★ 가장 중요한 조건: 객관식 문제인지 판단 ★★★★★
+    // 3-1. choices에 1~4 키가 있고 값이 있으면 객관식
+    var has1 = q.choices['1'] && q.choices['1'].trim() !== '';
+    var has2 = q.choices['2'] && q.choices['2'].trim() !== '';
+    var has3 = q.choices['3'] && q.choices['3'].trim() !== '';
+    var has4 = q.choices['4'] && q.choices['4'].trim() !== '';
+    
+    // 3-2. 명시적으로 객관식으로 표시된 경우 (A, B, C, D 패턴)
+    var hasLetterChoices = false;
+    var choiceKeys = Object.keys(q.choices);
+    for (var j = 0; j < choiceKeys.length; j++) {
+        var key = choiceKeys[j];
+        var val = q.choices[key];
+        if (typeof val === 'string' && val.trim() !== '') {
+            // A) B) C) D) 패턴 또는 A. B. C. D. 패턴
+            if (/^[A-Da-d][)\\.]/.test(val.trim())) {
+                hasLetterChoices = true;
+                break;
+            }
+        }
+    }
+    
+    // 3-3. 4개 이상의 선택지가 있으면 객관식으로 간주
+    var choiceCount = Object.keys(q.choices).filter(function(k) {
+        return q.choices[k] && q.choices[k].trim() !== '';
+    }).length;
+    
+    // 3-4. ★ 답변이 숫자이고 1~4 사이면 객관식
+    var answerIsNumeric = false;
+    if (q.answer) {
+        var ansNum = parseInt(q.answer);
+        if (!isNaN(ansNum) && ansNum >= 1 && ansNum <= 4) {
+            answerIsNumeric = true;
+        }
+    }
+    
+    // 종합 판단: 객관식 조건 충족 시 true 반환
+    var isMultipleChoice = (has1 && has2 && has3 && has4) || 
+                           hasLetterChoices || 
+                           choiceCount >= 3 ||
+                           (answerIsNumeric && choiceCount >= 2);
+    
+    // 디버그 로그
+    if (isMultipleChoice) {
+        console.log('📋 객관식 감지:', {
+            has1_2_3_4: has1 && has2 && has3 && has4,
+            hasLetterChoices: hasLetterChoices,
+            choiceCount: choiceCount,
+            answerIsNumeric: answerIsNumeric,
+            choices: q.choices
+        });
+    }
+    
+    return isMultipleChoice;
 }
 
 // ========================================================================
