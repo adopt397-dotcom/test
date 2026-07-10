@@ -441,7 +441,7 @@
 
     <!-- JS-0460: 회원가입 처리 (자동 로그인 탭 전환 + 이메일 입력) -->
     <script>
-        document.getElementById('testSignupBtn').addEventListener('click', async function() {
+       document.getElementById('testSignupBtn').addEventListener('click', async function() {
     const email = document.getElementById('signupEmail').value.trim();
     const name = document.getElementById('signupName').value.trim();
     const phone = document.getElementById('signupPhone').value.trim();
@@ -476,11 +476,9 @@
         const data = await response.json();
 
         if (data.success) {
-            showResult('signupResult', '✅ Registration successful! Please log in.', true);
-            // 1.5초 후 로그인 페이지로 이동 (사용자가 메시지를 확인할 수 있도록)
-            setTimeout(() => {
-                window.location.replace('./login.html');
-            }, 1500);
+            showResult('signupResult', '✅ ' + data.message, true);
+            // 🔥 회원가입 성공 시 무조건 login.html로 이동 (딜레이 없음)
+            window.location.href = './login.html';
         } else {
             showResult('signupResult', '❌ ' + data.message, false);
         }
@@ -488,20 +486,6 @@
         showResult('signupResult', '❌ Server connection error: ' + err.message, false);
     }
 });
-    </script>
-
-    <!-- JS-0470: 상태확인 -->
-    <script>
-        document.getElementById('testStatusBtn').addEventListener('click', async function() {
-            showResult('statusResult', '⏳ Checking...', false);
-            try {
-                const response = await fetch(GAS_URL);
-                const text = await response.text();
-                showResult('statusResult', '✅ GAS Response:\n' + text, true);
-            } catch (err) {
-                showResult('statusResult', '❌ Error: ' + err.message, false);
-            }
-        });
     </script>
 
     <!-- JS-0480: 비밀번호 변경 처리 -->
