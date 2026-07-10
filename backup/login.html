@@ -437,57 +437,52 @@
     <!-- JS-0460: 회원가입 처리 (자동 로그인 탭 전환 + 이메일 입력) -->
     <script>
         document.getElementById('testSignupBtn').addEventListener('click', async function() {
-            const email = document.getElementById('signupEmail').value.trim();
-            const name = document.getElementById('signupName').value.trim();
-            const phone = document.getElementById('signupPhone').value.trim();
-            const password = document.getElementById('signupPassword').value.trim();
-            const passwordConfirm = document.getElementById('signupPasswordConfirm').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const name = document.getElementById('signupName').value.trim();
+    const phone = document.getElementById('signupPhone').value.trim();
+    const password = document.getElementById('signupPassword').value.trim();
+    const passwordConfirm = document.getElementById('signupPasswordConfirm').value.trim();
 
-            if (!email || !name || !phone || !password || !passwordConfirm) {
-                showResult('signupResult', '❌ Please fill in all fields.', false);
-                return;
-            }
-            if (password !== passwordConfirm) {
-                showResult('signupResult', '❌ Passwords do not match.', false);
-                return;
-            }
-            if (password.length < 4) {
-                showResult('signupResult', '❌ Password must be at least 4 characters.', false);
-                return;
-            }
-            if (!/^[0-9]{10,11}$/.test(phone)) {
-                showResult('signupResult', '❌ Phone number must be 10-11 digits.', false);
-                return;
-            }
+    if (!email || !name || !phone || !password || !passwordConfirm) {
+        showResult('signupResult', '❌ Please fill in all fields.', false);
+        return;
+    }
+    if (password !== passwordConfirm) {
+        showResult('signupResult', '❌ Passwords do not match.', false);
+        return;
+    }
+    if (password.length < 4) {
+        showResult('signupResult', '❌ Password must be at least 4 characters.', false);
+        return;
+    }
+    if (!/^[0-9]{10,11}$/.test(phone)) {
+        showResult('signupResult', '❌ Phone number must be 10-11 digits.', false);
+        return;
+    }
 
-            showResult('signupResult', '⏳ Processing sign up...', false);
+    showResult('signupResult', '⏳ Processing sign up...', false);
 
-            try {
-                const response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({ action: 'signup', email, pin: password, name, pn: phone })
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    showResult('signupResult', '✅ ' + data.message, true);
-                    // 🔥 회원가입 성공 시 Login 탭으로 자동 전환 + 이메일 자동 입력
-                    const loginTab = document.querySelector('[data-tab="loginTab"]');
-                    if (loginTab) {
-                        loginTab.click();
-                        document.getElementById('loginEmail').value = email;
-                    } else {
-                        // loginTab이 없으면 login.html로 이동 (방어 코드)
-                        window.location.href = './login.html';
-                    }
-                } else {
-                    showResult('signupResult', '❌ ' + data.message, false);
-                }
-            } catch (err) {
-                showResult('signupResult', '❌ Server connection error: ' + err.message, false);
-            }
+    try {
+        const response = await fetch(GAS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'signup', email, pin: password, name, pn: phone })
         });
+        const data = await response.json();
+
+        if (data.success) {
+            showResult('signupResult', '✅ Registration successful! Please log in.', true);
+            // 1.5초 후 로그인 페이지로 이동 (사용자가 메시지를 확인할 수 있도록)
+            setTimeout(() => {
+                window.location.replace('./login.html');
+            }, 1500);
+        } else {
+            showResult('signupResult', '❌ ' + data.message, false);
+        }
+    } catch (err) {
+        showResult('signupResult', '❌ Server connection error: ' + err.message, false);
+    }
+});
     </script>
 
     <!-- JS-0470: 상태확인 -->
