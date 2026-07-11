@@ -2163,6 +2163,230 @@ function renderCoordinatePlane(parsedData) {
 }
 
 // ========================================================================
+// BLOCK 1234: 통합 방정식 그래프 엔진 v1.0
+// 지원: 일차/이차/절댓값/지수/원/연립/부등식/일반 좌표평면
+// ========================================================================
+function normalizeEquationExpression(input) {
+    var s = String(input == null ? '' : input).trim();
+    s = s.replace(/[−–—]/g, '-').replace(/×/g, '*').replace(/÷/g, '/');
+    s = s.replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/²/g, '^2').replace(/³/g, '^3');
+    s = s.replace(/\bpi\b/gi, 'pi').replace(/π/g, 'pi');
+    s = s.replace(/\bln\s*\(/gi, 'log(');
+    s = s.replace(/\|([^|]+)\|/g, 'abs($1)');
+    // 암시적 곱셈: 8x, 2(x+1), (x+1)(x-1), x(y+1)
+    s = s.replace(/(\d|[xy]|\))\s*(?=\()/gi, '$1*');
+    s = s.replace(/(\d|\))\s*(?=[xy])/gi, '$1*');
+    s = s.replace(/([xy])\s*(?=\d)/gi, '$1*');
+    s = s.replace(/\)\s*(?=\d|[xy])/gi, ')*');
+    return s.replace(/\s+/g, '');
+}
+
+function splitEquationRelation(input) {
+    var s = normalizeEquationExpression(input);
+    var m = s.match(/(<=|>=|=|<|>)/);
+    if (!m) return { left: 'y', op: '=', right: s, raw: s };
+    var i = m.index;
+    return { left: s.slice(0, i), op: m[1], right: s.slice(i + m[1].length), raw: s };
+}
+
+function compileMathExpression(expr, variables) {
+    var normalized = normalizeEquationExpression(expr);
+    if (typeof math !== 'undefined' && math.compile) {
+        var compiled = math.compile(normalized);
+        return function(scope) {
+            var value = compiled.evaluate(scope || {});
+            return Number(value);
+        };
+    }
+    // Math.js가 아직 없을 때의 안전한 기본 평가기
+    var js = normalized
+        .replace(/\^/g, '**')
+        .replace(/\babs\b/g, 'Math.abs')
+        .replace(/\bsqrt\b/g, 'Math.sqrt')
+        .replace(/\bsin\b/g, 'Math.sin')
+        .replace(/\bcos\b/g, 'Math.cos')
+        .replace(/\btan\b/g, 'Math.tan')
+        .replace(/\blog\b/g, 'Math.log')
+        .replace(/\bexp\b/g, 'Math.exp')
+        .replace(/\bpi\b/g, 'Math.PI');
+    if (!/^[0-9xy+\-*/().,A-Za-z_\s*]+$/.test(js)) throw new Error('허용되지 않는 수식 문자');
+    var names = variables || ['x', 'y'];
+    var fn = Function.apply(null, names.concat(['"use strict"; return (' + js + ');']));
+    return function(scope) {
+        var args = names.map(function(name) { return Number((scope || {})[name] || 0); });
+        return Number(fn.apply(null, args));
+    };
+}
+
+function compileEquationItem(input) {
+    var relation = splitEquationRelation(input);
+    var leftFn = compileMathExpression(relation.left, ['x', 'y']);
+    var rightFn = compileMathExpression(relation.right, ['x', 'y']);
+    return {
+        relation: relation,
+        value: function(x, y) { return leftFn({ x: x, y: y }) - rightFn({ x: x, y: y }); }
+    };
+}
+
+function upgradeLegacyEquationData(data) {
+    var out = Object.assign({}, data || {});
+    var equations = out.equations;
+    if (!equations && Array.isArray(out.functions)) equations = out.functions;
+    if (!equations && out.equation) equations = [out.equation];
+    if (!equations) equations = [];
+    if (!Array.isArray(equations)) equations = [equations];
+    out.equations = equations.map(function(item) {
+        if (typeof item === 'string') return { equation: item };
+        return Object.assign({}, item || {}, { equation: (item && (item.equation || item.expression || item.formula)) || '' });
+    }).filter(function(item) { return item.equation; });
+    return out;
+}
+
+function niceTickStep(min, max, requested) {
+    if (requested !== undefined && requested !== null && Number(requested) > 0) return Number(requested);
+    var range = Math.abs(max - min) || 1;
+    var rough = range / 10;
+    var power = Math.pow(10, Math.floor(Math.log10(rough)));
+    var fraction = rough / power;
+    var nice = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
+    return nice * power;
+}
+
+function createEquationCoordinateSystem(ctx, w, h, data) {
+    var xAxis = data.xAxis || {}, yAxis = data.yAxis || {};
+    var xMin = safeNumber(xAxis.min, -10), xMax = safeNumber(xAxis.max, 10);
+    var yMin = safeNumber(yAxis.min, -10), yMax = safeNumber(yAxis.max, 10);
+    if (!(xMax > xMin)) { xMin = -10; xMax = 10; }
+    if (!(yMax > yMin)) { yMin = -10; yMax = 10; }
+    var pad = { left: 62, right: 24, top: 24, bottom: 54 };
+    var graphW = w - pad.left - pad.right, graphH = h - pad.top - pad.bottom;
+    var equal = data.aspectMode === 'equal';
+    if (equal) {
+        var unit = Math.min(graphW / (xMax - xMin), graphH / (yMax - yMin));
+        graphW = unit * (xMax - xMin); graphH = unit * (yMax - yMin);
+        pad.left += (w - pad.left - pad.right - graphW) / 2;
+        pad.top += (h - pad.top - pad.bottom - graphH) / 2;
+    }
+    function toScreen(x, y) {
+        return { x: pad.left + (x - xMin) * graphW / (xMax - xMin), y: pad.top + graphH - (y - yMin) * graphH / (yMax - yMin) };
+    }
+    function toMath(sx, sy) {
+        return { x: xMin + (sx - pad.left) * (xMax - xMin) / graphW, y: yMin + (pad.top + graphH - sy) * (yMax - yMin) / graphH };
+    }
+    return { xMin:xMin,xMax:xMax,yMin:yMin,yMax:yMax,pad:pad,graphW:graphW,graphH:graphH,toScreen:toScreen,toMath:toMath };
+}
+
+function drawEquationAxes(ctx, c, data) {
+    var xAxis = data.xAxis || {}, yAxis = data.yAxis || {};
+    var xStep = niceTickStep(c.xMin, c.xMax, xAxis.tick);
+    var yStep = niceTickStep(c.yMin, c.yMax, yAxis.tick);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(c.pad.left, c.pad.top, c.graphW, c.graphH); ctx.clip();
+    ctx.strokeStyle = data.gridColor || '#d6d6d6'; ctx.lineWidth = 1;
+    for (var x = Math.ceil(c.xMin / xStep) * xStep; x <= c.xMax + xStep * 1e-6; x += xStep) {
+        var sx = c.toScreen(x, 0).x; ctx.beginPath(); ctx.moveTo(sx, c.pad.top); ctx.lineTo(sx, c.pad.top + c.graphH); ctx.stroke();
+    }
+    for (var y = Math.ceil(c.yMin / yStep) * yStep; y <= c.yMax + yStep * 1e-6; y += yStep) {
+        var sy = c.toScreen(0, y).y; ctx.beginPath(); ctx.moveTo(c.pad.left, sy); ctx.lineTo(c.pad.left + c.graphW, sy); ctx.stroke();
+    }
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 1.8;
+    if (c.xMin <= 0 && c.xMax >= 0) { var ox = c.toScreen(0,0).x; ctx.beginPath(); ctx.moveTo(ox,c.pad.top); ctx.lineTo(ox,c.pad.top+c.graphH); ctx.stroke(); }
+    if (c.yMin <= 0 && c.yMax >= 0) { var oy = c.toScreen(0,0).y; ctx.beginPath(); ctx.moveTo(c.pad.left,oy); ctx.lineTo(c.pad.left+c.graphW,oy); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle='#333'; ctx.font='12px sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    for (var xt = Math.ceil(c.xMin / xStep) * xStep; xt <= c.xMax + xStep * 1e-6; xt += xStep) {
+        var xp=c.toScreen(xt,0).x; ctx.fillText(Number(xt.toFixed(10)).toString(),xp,c.pad.top+c.graphH+6);
+    }
+    ctx.textAlign='right'; ctx.textBaseline='middle';
+    for (var yt = Math.ceil(c.yMin / yStep) * yStep; yt <= c.yMax + yStep * 1e-6; yt += yStep) {
+        var yp=c.toScreen(0,yt).y; ctx.fillText(Number(yt.toFixed(10)).toString(),c.pad.left-7,yp);
+    }
+    ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.font='14px sans-serif';
+    ctx.fillText(xAxis.label || 'x', c.pad.left+c.graphW/2, hSafe(ctx.canvas, 8));
+    ctx.save(); ctx.translate(16,c.pad.top+c.graphH/2); ctx.rotate(-Math.PI/2); ctx.fillText(yAxis.label || 'y',0,0); ctx.restore();
+}
+function hSafe(canvas, margin) { return (parseFloat(canvas.style.height) || canvas.height / (window.devicePixelRatio || 1) || 400) - margin; }
+
+function relationMatches(op, v) {
+    var eps = 1e-9;
+    if (op === '<') return v < 0; if (op === '<=') return v <= eps;
+    if (op === '>') return v > 0; if (op === '>=') return v >= -eps;
+    return Math.abs(v) <= eps;
+}
+
+function drawImplicitCurve(ctx, c, compiled, style) {
+    var cols = Math.max(120, Math.min(420, Math.round(c.graphW)));
+    var rows = Math.max(100, Math.min(360, Math.round(c.graphH)));
+    var dx=(c.xMax-c.xMin)/cols, dy=(c.yMax-c.yMin)/rows;
+    ctx.save(); ctx.beginPath(); ctx.rect(c.pad.left,c.pad.top,c.graphW,c.graphH); ctx.clip();
+    ctx.strokeStyle=style.color || '#111'; ctx.lineWidth=safeNumber(style.lineWidth,2.5); ctx.setLineDash(style.dash || []);
+    function interp(x1,y1,v1,x2,y2,v2){ var den=v1-v2; var t=Math.abs(den)<1e-15?0.5:v1/den; t=Math.max(0,Math.min(1,t)); return c.toScreen(x1+t*(x2-x1),y1+t*(y2-y1)); }
+    for(var j=0;j<rows;j++){
+        var y0=c.yMin+j*dy,y1=y0+dy;
+        for(var i=0;i<cols;i++){
+            var x0=c.xMin+i*dx,x1=x0+dx;
+            var v00=compiled.value(x0,y0),v10=compiled.value(x1,y0),v11=compiled.value(x1,y1),v01=compiled.value(x0,y1);
+            if(![v00,v10,v11,v01].every(Number.isFinite)) continue;
+            var hits=[];
+            if((v00<=0)!=(v10<=0)) hits.push(interp(x0,y0,v00,x1,y0,v10));
+            if((v10<=0)!=(v11<=0)) hits.push(interp(x1,y0,v10,x1,y1,v11));
+            if((v11<=0)!=(v01<=0)) hits.push(interp(x1,y1,v11,x0,y1,v01));
+            if((v01<=0)!=(v00<=0)) hits.push(interp(x0,y1,v01,x0,y0,v00));
+            if(hits.length===2){ctx.beginPath();ctx.moveTo(hits[0].x,hits[0].y);ctx.lineTo(hits[1].x,hits[1].y);ctx.stroke();}
+            else if(hits.length===4){ctx.beginPath();ctx.moveTo(hits[0].x,hits[0].y);ctx.lineTo(hits[1].x,hits[1].y);ctx.moveTo(hits[2].x,hits[2].y);ctx.lineTo(hits[3].x,hits[3].y);ctx.stroke();}
+        }
+    }
+    ctx.restore();
+}
+
+function drawInequalityRegion(ctx, c, compiled, style) {
+    var pixel = Math.max(2, safeNumber(style.shadeResolution, 3));
+    ctx.save(); ctx.beginPath(); ctx.rect(c.pad.left,c.pad.top,c.graphW,c.graphH); ctx.clip();
+    ctx.fillStyle=style.fillColor || 'rgba(52,152,219,0.18)';
+    for(var sy=c.pad.top;sy<c.pad.top+c.graphH;sy+=pixel){
+        for(var sx=c.pad.left;sx<c.pad.left+c.graphW;sx+=pixel){
+            var p=c.toMath(sx+pixel/2,sy+pixel/2),v=compiled.value(p.x,p.y);
+            if(Number.isFinite(v)&&relationMatches(compiled.relation.op,v)) ctx.fillRect(sx,sy,pixel,pixel);
+        }
+    }
+    ctx.restore();
+    drawImplicitCurve(ctx,c,compiled,Object.assign({},style,{dash:(compiled.relation.op==='<'||compiled.relation.op==='>')?[7,5]:[]}));
+}
+
+function drawEquationPointsAndSegments(ctx,c,data){
+    (data.segments||[]).forEach(function(seg){var a=c.toScreen(seg.from[0],seg.from[1]),b=c.toScreen(seg.to[0],seg.to[1]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.strokeStyle=seg.color||'#333';ctx.lineWidth=seg.lineWidth||2;ctx.setLineDash(seg.dash||[]);ctx.stroke();ctx.setLineDash([]);});
+    (data.points||[]).forEach(function(pt){var p=c.toScreen(Number(pt.x),Number(pt.y));ctx.beginPath();ctx.arc(p.x,p.y,pt.radius||5,0,Math.PI*2);ctx.fillStyle=pt.color||'#3498db';ctx.fill();if(pt.label){ctx.fillStyle='#222';ctx.font='12px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(pt.label,p.x,p.y-8);}});
+}
+
+function renderEquationGraph(parsedData) {
+    var data=upgradeLegacyEquationData(parsedData);
+    var canvasId='equation_'+Math.random().toString(36).substr(2,9);
+    var height=safeNumber(data.height,420);
+    var html='<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;position:relative;">'+
+        (data.title?'<div style="text-align:center;font-weight:700;margin-bottom:8px;">'+escapeHtml(data.title)+'</div>':'')+
+        '<canvas id="'+canvasId+'" style="width:100%;height:'+height+'px;display:block;background:white;border-radius:4px;"></canvas></div>';
+    setTimeout(function(){
+        initCanvas(canvasId,650,height).then(function(result){
+            if(!result)return;
+            var ctx=result.ctx,w=result.w,h=result.h,c=createEquationCoordinateSystem(ctx,w,h,data);
+            ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);
+            drawEquationAxes(ctx,c,data);
+            data.equations.forEach(function(item,index){
+                try{
+                    var compiled=compileEquationItem(item.equation);
+                    var style=Object.assign({color:['#111','#d62728','#1f77b4','#2ca02c'][index%4]},item);
+                    if(compiled.relation.op==='=' ) drawImplicitCurve(ctx,c,compiled,style); else drawInequalityRegion(ctx,c,compiled,style);
+                }catch(err){console.error('Equation compile/render error:',item.equation,err);}
+            });
+            drawEquationPointsAndSegments(ctx,c,data);
+        });
+    },100);
+    if(typeof math==='undefined') ensureMathJS().catch(function(e){console.warn('Math.js unavailable; fallback evaluator used',e);});
+    return html;
+}
+
+// ========================================================================
 // BLOCK 1240: Box-Plot 렌더러 (SAT 통계)
 // ========================================================================
 function renderBoxPlotType(parsedData) {
@@ -2917,10 +3141,18 @@ function renderGraphic(jsonData) {
             return renderGraphicType(parsedData);
         case 'shape':
             return renderShapeType(parsedData);
+        case 'equation-graph':
+        case 'equation':
+        case 'linear-graph':
+        case 'quadratic-graph':
+        case 'absolute-value':
+        case 'exponential-graph':
+        case 'circle-equation':
+        case 'system-of-equations':
+        case 'inequality-graph':
         case 'coordinate-plane':
-            return renderCoordinatePlane(parsedData);
         case 'function':
-            return renderCoordinatePlane(parsedData);
+            return renderEquationGraph(parsedData);
         case 'box-plot':
         case 'boxplot':
             return renderBoxPlotType(parsedData);
@@ -3629,6 +3861,8 @@ window.renderWithEditingMarks = renderWithEditingMarks;
 
 // 1. 전역(window) 노출
 window.renderGraphic = renderGraphic;
+window.renderEquationGraph = renderEquationGraph;
+window.normalizeEquationExpression = normalizeEquationExpression;
 window.currentQuestions = currentQuestions;    
 window.currentIndex = currentIndex;            
 window.userAnswers = userAnswers;
