@@ -3023,7 +3023,7 @@ function showExplanation() {
 }
 
 // ========================================================================
-// BLOCK 1330: renderCurrentQuestion (원본 B011 + 렌더 토큰 + 메모리 관리)
+// BLOCK 1330: renderCurrentQuestion (수정 - 수식만 LaTeX 처리)
 // ========================================================================
 function renderCurrentQuestion() {
   console.log('🔴 renderCurrentQuestion START');
@@ -3071,7 +3071,19 @@ function renderCurrentQuestion() {
       '</div>';
   }
   
-  var questionDisplay = renderWithEditingMarks(q.question || 'No question text', isMath);
+  // ★★★ 수정: 수식만 LaTeX로 감싸고 질문은 일반 텍스트로 ★★★
+  var questionText = q.question || 'No question text';
+  
+  // 수식 패턴 찾기 (숫자, 변수, 연산자, 괄호, 제곱符号)
+  var mathPattern = /([0-9]+[x\^\(\)\+\-\*\/=²³]+[0-9x\^\(\)\+\-\*\/=²³]*|[0-9]²|[a-zA-Z]²|[0-9]+\^\{?[0-9]+\}?|[a-zA-Z]\^\{?[0-9a-zA-Z]+\}?)/g;
+  
+  // 수식 부분만 \(...\)로 감싸기
+  var questionDisplay = questionText.replace(mathPattern, '\\($1\\)');
+  
+  // 만약 수식이 없거나 이미 감싸져 있으면 그대로
+  if (questionDisplay === questionText) {
+    questionDisplay = questionText;
+  }
   
   if (isSubjective) {
     renderSubjectiveQuestion(q, answered, headerText, passageHtml);
@@ -3095,14 +3107,14 @@ function renderCurrentQuestion() {
     '<div class="q-num">' + headerText + '</div>' +
     passageHtml +
     renderGraphic(q.graphic) +
-    '<div class="question-text math-content">' + questionDisplay + '</div>' +
+    '<div class="question-text">' + questionDisplay + '</div>' +
     '<div class="choices">';
   
   for (var idx = 0; idx < validKeys.length; idx++) {
     var key = validKeys[idx];
     var choiceNum = parseInt(key);
     var letter = getAnswerLetter(idx + 1);
-    var choiceText = autoWrapLatex(q.choices[key] || '');
+    var choiceText = q.choices[key] || '';
     if (!choiceText) continue;
     var isSelected = (answered === choiceNum);
     var isCorrectChoice = (choiceNum === displayAnswer);
@@ -3164,17 +3176,6 @@ function renderCurrentQuestion() {
     DOM.submitBtn.style.display = 'none';
   }
   DOM.prevBtn.disabled = (currentIndex === 0);
-}
-
-function handleChoiceClick(e) {
-  var el = e.currentTarget;
-  var choice = parseInt(el.getAttribute('data-choice'));
-  if (isNaN(choice)) return;
-  userAnswers[currentIndex] = choice;
-  if (choice === parseInt(currentQuestions[currentIndex].answer)) correctCount++;
-  saveProgressImmediate();
-  renderCurrentQuestion();
-  showExplanation();
 }
 
 // ========================================================================
