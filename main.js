@@ -2016,9 +2016,545 @@ function renderShapeType(parsedData) {
     return html;
 }
 
+
 // ========================================================================
-// BLOCK 1230: 좌표평면 렌더러 (coordinate-plane)
+// BLOCK 1230: Geometry 2D Engine v2.1 (자기 등록형 완성본)
+// 사용법: 기존 BLOCK 1230 전체를 이 블록으로 교체하면 끝.
+// 별도의 switch 수정 / window 등록 수정이 필요하지 않음.
 // ========================================================================
+
+function geometry2DSafeNumber(value, fallback) {
+    var n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function geometry2DNormalizePoint(point, fallbackId) {
+    if (Array.isArray(point)) {
+        return {
+            id: fallbackId || '',
+            x: geometry2DSafeNumber(point[0], 0),
+            y: geometry2DSafeNumber(point[1], 0),
+            visible: true
+        };
+    }
+
+    point = point || {};
+
+    return {
+        id: point.id || fallbackId || '',
+        x: geometry2DSafeNumber(point.x, 0),
+        y: geometry2DSafeNumber(point.y, 0),
+        label: point.label,
+        visible: point.visible !== false
+    };
+}
+
+function geometry2DPointMap(points) {
+    var map = {};
+
+    if (Array.isArray(points)) {
+        points.forEach(function(point, index) {
+            var id = point && point.id ? point.id : 'P' + index;
+            map[id] = geometry2DNormalizePoint(point, id);
+        });
+    } else if (points && typeof points === 'object') {
+        Object.keys(points).forEach(function(id) {
+            map[id] = geometry2DNormalizePoint(points[id], id);
+            map[id].id = id;
+        });
+    }
+
+    return map;
+}
+
+function geometry2DGetPoint(pointMap, reference) {
+    if (reference === null || reference === undefined) return null;
+
+    if (typeof reference === 'string') {
+        return pointMap[reference] || null;
+    }
+
+    if (Array.isArray(reference)) {
+        return geometry2DNormalizePoint(reference, '');
+    }
+
+    if (typeof reference === 'object') {
+        return geometry2DNormalizePoint(reference, reference.id || '');
+    }
+
+    return null;
+}
+
+function geometry2DCreateViewport(width, height, data) {
+    var padding = geometry2DSafeNumber(data.padding, 34);
+    var noteSpace = data.note ? 40 : 10;
+
+    var viewBox = data.viewBox || {};
+    var minX = geometry2DSafeNumber(viewBox.minX, 0);
+    var maxX = geometry2DSafeNumber(viewBox.maxX, 100);
+    var minY = geometry2DSafeNumber(viewBox.minY, 0);
+    var maxY = geometry2DSafeNumber(viewBox.maxY, 100);
+
+    if (maxX === minX) maxX = minX + 1;
+    if (maxY === minY) maxY = minY + 1;
+
+    var drawingWidth = Math.max(1, width - padding * 2);
+    var drawingHeight = Math.max(1, height - padding * 2 - noteSpace);
+
+    return {
+        toScreen: function(point) {
+            return {
+                x: padding + ((point.x - minX) / (maxX - minX)) * drawingWidth,
+                y: padding + drawingHeight - ((point.y - minY) / (maxY - minY)) * drawingHeight
+            };
+        }
+    };
+}
+
+function geometry2DDrawSegment(ctx, viewport, from, to, style) {
+    if (!from || !to) return;
+
+    style = style || {};
+    var a = viewport.toScreen(from);
+    var b = viewport.toScreen(to);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = style.color || '#111';
+    ctx.lineWidth = geometry2DSafeNumber(style.lineWidth, 2);
+
+    if (style.dashed) {
+        ctx.setLineDash(Array.isArray(style.dash) ? style.dash : [7, 5]);
+    }
+
+    ctx.stroke();
+    ctx.restore();
+}
+
+function geometry2DDrawPoint(ctx, viewport, point, style) {
+    if (!point || point.visible === false) return;
+
+    style = style || {};
+    var p = viewport.toScreen(point);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(
+        p.x,
+        p.y,
+        geometry2DSafeNumber(style.radius, 3.5),
+        0,
+        Math.PI * 2
+    );
+    ctx.fillStyle = style.color || '#111';
+    ctx.fill();
+    ctx.restore();
+}
+
+function geometry2DDrawText(ctx, viewport, label) {
+    if (!label || label.text === undefined) return;
+
+    var p = viewport.toScreen({
+        x: geometry2DSafeNumber(label.x, 0),
+        y: geometry2DSafeNumber(label.y, 0)
+    });
+
+    ctx.save();
+    ctx.font =
+        (label.italic ? 'italic ' : '') +
+        geometry2DSafeNumber(label.fontSize, 17) +
+        'px ' +
+        (label.fontFamily || 'Georgia, serif');
+    ctx.fillStyle = label.color || '#111';
+    ctx.textAlign = label.align || 'center';
+    ctx.textBaseline = label.baseline || 'middle';
+    ctx.fillText(
+        String(label.text),
+        p.x + geometry2DSafeNumber(label.dx, 0),
+        p.y + geometry2DSafeNumber(label.dy, 0)
+    );
+    ctx.restore();
+}
+
+function geometry2DDrawParallelMark(ctx, viewport, from, to, position, count) {
+    if (!from || !to) return;
+
+    var a = viewport.toScreen(from);
+    var b = viewport.toScreen(to);
+    var ratio = geometry2DSafeNumber(position, 0.5);
+
+    var centerX = a.x + (b.x - a.x) * ratio;
+    var centerY = a.y + (b.y - a.y) * ratio;
+
+    var dx = b.x - a.x;
+    var dy = b.y - a.y;
+    var length = Math.hypot(dx, dy) || 1;
+
+    var ux = dx / length;
+    var uy = dy / length;
+    var nx = -uy;
+    var ny = ux;
+
+    var slashCount = Math.max(1, Math.round(count || 1));
+    var slashLength = 10;
+    var separation = 7;
+
+    ctx.save();
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 1.5;
+
+    for (var i = 0; i < slashCount; i++) {
+        var offset = (i - (slashCount - 1) / 2) * separation;
+        var x = centerX + ux * offset;
+        var y = centerY + uy * offset;
+
+        ctx.beginPath();
+        ctx.moveTo(
+            x - nx * slashLength / 2 - ux * 3,
+            y - ny * slashLength / 2 - uy * 3
+        );
+        ctx.lineTo(
+            x + nx * slashLength / 2 + ux * 3,
+            y + ny * slashLength / 2 + uy * 3
+        );
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+function geometry2DDrawRightAngle(ctx, viewport, mark, pointMap) {
+    var vertex = geometry2DGetPoint(pointMap, mark.vertex);
+    var arm1 = geometry2DGetPoint(pointMap, mark.arm1);
+    var arm2 = geometry2DGetPoint(pointMap, mark.arm2);
+
+    if (!vertex || !arm1 || !arm2) return;
+
+    var v = viewport.toScreen(vertex);
+    var a = viewport.toScreen(arm1);
+    var b = viewport.toScreen(arm2);
+    var size = geometry2DSafeNumber(mark.size, 13);
+
+    var va = {x: a.x - v.x, y: a.y - v.y};
+    var vb = {x: b.x - v.x, y: b.y - v.y};
+
+    var la = Math.hypot(va.x, va.y) || 1;
+    var lb = Math.hypot(vb.x, vb.y) || 1;
+
+    va.x = va.x / la * size;
+    va.y = va.y / la * size;
+    vb.x = vb.x / lb * size;
+    vb.y = vb.y / lb * size;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(v.x + va.x, v.y + va.y);
+    ctx.lineTo(v.x + va.x + vb.x, v.y + va.y + vb.y);
+    ctx.lineTo(v.x + vb.x, v.y + vb.y);
+    ctx.strokeStyle = mark.color || '#111';
+    ctx.lineWidth = geometry2DSafeNumber(mark.lineWidth, 1.5);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function geometry2DExpandParallelTransversal(data) {
+    var vars = data.vars || {};
+    var angle = geometry2DSafeNumber(vars.angle, 110);
+    var unknown = vars.unknown || 'x';
+    var lineLabels = Array.isArray(vars.lineLabels) ? vars.lineLabels : ['s', 't'];
+    var transversalLabel = vars.transversalLabel || 'c';
+
+    return {
+        type: 'geometry-2d',
+        height: geometry2DSafeNumber(data.height, 330),
+        padding: 34,
+        viewBox: {minX: 0, maxX: 100, minY: 0, maxY: 100},
+        points: {
+            S1: [8, 66],
+            S2: [92, 66],
+            T1: [8, 34],
+            T2: [92, 34],
+            C1: [18, 8],
+            C2: [82, 92]
+        },
+        segments: [
+            {from: 'S1', to: 'S2', lineWidth: 2},
+            {from: 'T1', to: 'T2', lineWidth: 2},
+            {from: 'C1', to: 'C2', lineWidth: 2}
+        ],
+        labels: [
+            {text: lineLabels[0], x: 95, y: 66, italic: true, fontSize: 18, align: 'left'},
+            {text: lineLabels[1], x: 95, y: 34, italic: true, fontSize: 18, align: 'left'},
+            {text: transversalLabel, x: 83, y: 95, italic: true, fontSize: 18},
+            {text: angle + '°', x: 35, y: 39, fontSize: 17},
+            {text: unknown + '°', x: 69, y: 70, fontSize: 17, italic: true}
+        ],
+        marks: [
+            {type: 'parallel', segment: ['S1', 'S2'], position: 0.22, count: 1},
+            {type: 'parallel', segment: ['T1', 'T2'], position: 0.22, count: 1}
+        ],
+        note: data.note === false
+            ? ''
+            : (data.note || 'Note: Figure not drawn to scale.')
+    };
+}
+
+function geometry2DExpandRightTriangle(data) {
+    var vars = data.vars || {};
+    var a = geometry2DSafeNumber(vars.a, 4);
+    var b = geometry2DSafeNumber(vars.b, 5);
+    var unknown = vars.unknown || 'c';
+
+    return {
+        type: 'geometry-2d',
+        height: geometry2DSafeNumber(data.height, 330),
+        viewBox: {minX: 0, maxX: 100, minY: 0, maxY: 100},
+        points: {
+            A: [18, 18],
+            B: [82, 18],
+            C: [18, 78]
+        },
+        segments: [
+            {from: 'A', to: 'B'},
+            {from: 'A', to: 'C'},
+            {from: 'B', to: 'C'}
+        ],
+        labels: [
+            {text: String(a), x: 50, y: 12, fontSize: 17},
+            {text: String(b), x: 11, y: 48, fontSize: 17},
+            {text: String(unknown), x: 54, y: 53, fontSize: 17, italic: true}
+        ],
+        marks: [
+            {type: 'right-angle', vertex: 'A', arm1: 'B', arm2: 'C', size: 14}
+        ],
+        note: data.note || ''
+    };
+}
+
+function geometry2DExpandTemplate(data) {
+    var template = String(data.template || data.shape || '').toLowerCase();
+
+    switch (template) {
+        case 'parallel-lines-transversal':
+            return geometry2DExpandParallelTransversal(data);
+
+        case 'right-triangle':
+            return geometry2DExpandRightTriangle(data);
+
+        default:
+            return data;
+    }
+}
+
+function geometry2DDrawGeneric(ctx, width, height, rawData) {
+    var data = geometry2DExpandTemplate(rawData);
+    var viewport = geometry2DCreateViewport(width, height, data);
+    var pointMap = geometry2DPointMap(data.points);
+
+    ctx.save();
+    ctx.fillStyle = data.background || '#fff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+
+    var polygons = Array.isArray(data.polygons) ? data.polygons : [];
+
+    polygons.forEach(function(polygon) {
+        var vertices = Array.isArray(polygon.vertices) ? polygon.vertices : [];
+        if (vertices.length < 3) return;
+
+        ctx.save();
+        ctx.beginPath();
+
+        vertices.forEach(function(reference, index) {
+            var point = geometry2DGetPoint(pointMap, reference);
+            if (!point) return;
+            var p = viewport.toScreen(point);
+
+            if (index === 0) ctx.moveTo(p.x, p.y);
+            else ctx.lineTo(p.x, p.y);
+        });
+
+        ctx.closePath();
+
+        if (polygon.fill) {
+            ctx.fillStyle = polygon.fill;
+            ctx.fill();
+        }
+
+        ctx.strokeStyle = polygon.color || '#111';
+        ctx.lineWidth = geometry2DSafeNumber(polygon.lineWidth, 2);
+
+        if (polygon.dashed) ctx.setLineDash([7, 5]);
+
+        ctx.stroke();
+        ctx.restore();
+    });
+
+    var segments = Array.isArray(data.segments) ? data.segments : [];
+
+    segments.forEach(function(segment) {
+        var fromRef = Array.isArray(segment) ? segment[0] : segment.from;
+        var toRef = Array.isArray(segment) ? segment[1] : segment.to;
+
+        geometry2DDrawSegment(
+            ctx,
+            viewport,
+            geometry2DGetPoint(pointMap, fromRef),
+            geometry2DGetPoint(pointMap, toRef),
+            segment
+        );
+    });
+
+    var marks = Array.isArray(data.marks) ? data.marks : [];
+
+    marks.forEach(function(mark) {
+        if (!mark || !mark.type) return;
+
+        if (mark.type === 'parallel' && Array.isArray(mark.segment)) {
+            geometry2DDrawParallelMark(
+                ctx,
+                viewport,
+                geometry2DGetPoint(pointMap, mark.segment[0]),
+                geometry2DGetPoint(pointMap, mark.segment[1]),
+                mark.position,
+                mark.count
+            );
+        } else if (mark.type === 'right-angle') {
+            geometry2DDrawRightAngle(ctx, viewport, mark, pointMap);
+        }
+    });
+
+    if (data.showPoints) {
+        Object.keys(pointMap).forEach(function(id) {
+            geometry2DDrawPoint(ctx, viewport, pointMap[id], data.pointStyle || {});
+        });
+    }
+
+    Object.keys(pointMap).forEach(function(id) {
+        var point = pointMap[id];
+
+        if (point.label) {
+            geometry2DDrawText(ctx, viewport, {
+                text: point.label,
+                x: point.x,
+                y: point.y,
+                dx: 8,
+                dy: -8,
+                align: 'left'
+            });
+        }
+    });
+
+    var labels = Array.isArray(data.labels) ? data.labels : [];
+    labels.forEach(function(label) {
+        geometry2DDrawText(ctx, viewport, label);
+    });
+
+    if (data.note) {
+        ctx.save();
+        ctx.font = '15px Georgia, serif';
+        ctx.fillStyle = '#222';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(String(data.note), width / 2, height - 8);
+        ctx.restore();
+    }
+}
+
+function renderGeometry2D(parsedData) {
+    var canvasId = 'geometry2d_' + Math.random().toString(36).slice(2, 11);
+    var height = geometry2DSafeNumber(parsedData && parsedData.height, 360);
+
+    var html =
+        '<div style="margin:15px 0;padding:12px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;">' +
+            '<canvas id="' + canvasId + '" style="width:100%;height:' + height + 'px;display:block;"></canvas>' +
+        '</div>';
+
+    setTimeout(function() {
+        initCanvas(canvasId, 650, height).then(function(result) {
+            if (!result) return;
+
+            try {
+                geometry2DDrawGeneric(
+                    result.ctx,
+                    result.w,
+                    result.h,
+                    parsedData || {}
+                );
+            } catch (error) {
+                console.error('Geometry 2D render error:', error, parsedData);
+
+                if (result.canvas && result.canvas.parentElement) {
+                    result.canvas.parentElement.innerHTML =
+                        '<div style="padding:20px;text-align:center;color:#c0392b;">' +
+                        'Geometry 2D rendering error: ' +
+                        escapeHtml(error.message) +
+                        '</div>';
+                }
+            }
+        });
+    }, 0);
+
+    return html;
+}
+
+// ------------------------------------------------------------------------
+// 자기 등록부
+// 이 블록 하나만 교체해도 geometry-2d 타입이 renderGraphic에 연결된다.
+// ------------------------------------------------------------------------
+
+var geometry2DOriginalRenderGraphic = renderGraphic;
+
+renderGraphic = function(jsonData) {
+    var parsedData = null;
+
+    try {
+        if (jsonData && typeof jsonData === 'object') {
+            parsedData = jsonData;
+        } else if (typeof jsonData === 'string' && jsonData.trim() !== '') {
+            var raw = jsonData.trim();
+
+            if (raw.startsWith('"') && raw.endsWith('"')) {
+                raw = raw.slice(1, -1);
+            }
+
+            raw = raw.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+            parsedData = JSON.parse(raw);
+        }
+    } catch (error) {
+        parsedData = null;
+    }
+
+    var type = parsedData && parsedData.type
+        ? String(parsedData.type).toLowerCase()
+        : '';
+
+    if (
+        type === 'geometry-2d' ||
+        type === 'geometry2d' ||
+        type === 'geometry'
+    ) {
+        return renderGeometry2D(parsedData);
+    }
+
+    return geometry2DOriginalRenderGraphic(jsonData);
+};
+
+// 전역 노출도 이 블록 안에서 처리
+window.renderGeometry2D = renderGeometry2D;
+window.renderGraphic = renderGraphic;
+
+console.log('✅ BLOCK 1230 Geometry 2D Engine v2.1 registered');
+// ========================================================================
+// END BLOCK 1230
+// ========================================================================
+
+
+
+
+
 
 // ========================================================================
 // BLOCK 1231: 함수 평가기
