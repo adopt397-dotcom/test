@@ -3149,7 +3149,7 @@ function renderCurrentQuestion() {
     console.warn('⚠️ MathJax not available. LaTeX will not render.');
   }
   
-  // ★★★ handleChoiceClick을 전역 함수로 호출하도록 수정 ★★★
+  // ★★★ handleChoiceClick 사용 (전역 함수) ★★★
   var choiceEls = DOM.questionContainer.querySelectorAll('.choice:not(.disabled)');
   choiceEls.forEach(function(el) {
     el.removeEventListener('click', handleChoiceClick);
