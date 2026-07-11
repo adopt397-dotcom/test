@@ -2807,66 +2807,139 @@ function renderChartWithChartJS(parsedData, chartId) {
 // BLOCK 1280: 메인 renderGraphic 함수 (SAT 모든 타입 통합)
 // ========================================================================
 function renderGraphic(jsonData) {
+    // 1️⃣ JSON 문자열이 아니면 변환
+    if (typeof jsonData === 'object' && jsonData !== null) {
+        jsonData = JSON.stringify(jsonData);
+    }
+
     if (!jsonData || jsonData.trim() == "") return "";
-    
+
     var data = jsonData.trim();
     if (data.startsWith("\"") && data.endsWith("\"")) data = data.slice(1, -1);
     data = data.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-    
+
     var parsedData = null;
     try {
         parsedData = JSON.parse(data);
-    } catch(e) {
+    } catch (e) {
         return '<div style="padding:10px;color:#999;text-align:center;">📊 Invalid JSON</div>';
     }
-    
+
     if (!parsedData || typeof parsedData !== 'object') {
         return '<div style="padding:10px;color:#999;text-align:center;">📊 No data</div>';
     }
-    
+
     var type = parsedData.type || '';
-    
-    // ★★★ SAT 모든 그래픽 타입 지원 ★★★
-    switch(type) {
-        // === 도형/기하 ===
+
+    // ★★★ scatter-only를 먼저 처리 (Chart.js 직접 렌더링) ★★★
+    if (type === 'scatter-only' && parsedData.points && Array.isArray(parsedData.points)) {
+        var canvasId = 'chart_' + Math.random().toString(36).substr(2, 9);
+        var html = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;">' +
+            '<canvas id="' + canvasId + '" style="width:100%;height:400px;display:block;"></canvas>' +
+            '</div>';
+
+        // Chart.js 렌더링 (setTimeout으로 DOM 준비 후 실행)
+        setTimeout(function () {
+            var canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            var ctx = canvas.getContext('2d');
+
+            if (typeof Chart !== 'undefined') {
+                try {
+                    new Chart(ctx, {
+                        type: 'scatter',
+                        data: {
+                            datasets: [{
+                                label: 'Data',
+                                data: parsedData.points,
+                                backgroundColor: '#3498db',
+                                borderColor: '#2980b9',
+                                pointRadius: 6,
+                                pointHoverRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return '(' + context.parsed.x + ', ' + context.parsed.y + ')';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    min: parsedData.xAxis?.min !== undefined ? parsedData.xAxis.min : undefined,
+                                    max: parsedData.xAxis?.max !== undefined ? parsedData.xAxis.max : undefined,
+                                    ticks: {
+                                        stepSize: parsedData.xAxis?.tick || 1
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: parsedData.xAxis?.label || 'x'
+                                    },
+                                    grid: { color: '#e0e0e0' }
+                                },
+                                y: {
+                                    min: parsedData.yAxis?.min !== undefined ? parsedData.yAxis.min : undefined,
+                                    max: parsedData.yAxis?.max !== undefined ? parsedData.yAxis.max : undefined,
+                                    ticks: {
+                                        stepSize: parsedData.yAxis?.tick || 1
+                                    },
+                                    title: {
+                                        display: true,
+                                        text: parsedData.yAxis?.label || 'y'
+                                    },
+                                    grid: { color: '#e0e0e0' }
+                                }
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.error('❌ Chart.js scatter error:', e);
+                }
+            } else {
+                console.warn('⚠️ Chart.js not loaded');
+                canvas.parentElement.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">📊 Chart.js 로딩 중...</div>';
+            }
+        }, 150);
+
+        return html;
+    }
+
+    // ★★★ SAT 모든 그래픽 타입 지원 (기존 switch문) ★★★
+    switch (type) {
         case 'graphic':
             return renderGraphicType(parsedData);
         case 'shape':
             return renderShapeType(parsedData);
-        
-        // === 좌표평면/함수 ===
         case 'coordinate-plane':
             return renderCoordinatePlane(parsedData);
         case 'function':
             return renderCoordinatePlane(parsedData);
-        
-        // === 통계 그래프 (SAT 단골) ===
         case 'box-plot':
         case 'boxplot':
             return renderBoxPlotType(parsedData);
         case 'normal-distribution':
         case 'normal':
             return renderNormalDistributionType(parsedData);
-        
-        // === 표 ===
         case 'table':
         case 'frequency-table':
             return renderTableType(parsedData);
-        
-        // === Chart.js 기반 차트 ===
         case 'bar':
         case 'pie':
         case 'line':
         case 'scatter':
-        case 'scatter-only':
         case 'dot-plot':
         case 'stacked-bar':
         case 'radar':
         case 'compare':
         case 'histogram':
             return renderChartType(parsedData);
-        
-        // === 지원되지 않는 타입 ===
         default:
             return '<div style="padding:10px;text-align:center;color:#999;border:1px dashed #ddd;border-radius:8px;margin:15px 0;">' +
                 '<span style="font-size:20px;">📊</span>' +
