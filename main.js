@@ -792,21 +792,263 @@ async function detectTotalQuestions() {
     return TOTAL_QUESTIONS;
 }
 
-// ============================================================
-// ★★★ 2-5. 선택지가 없으면 주관식으로 처리 ★★★
-// ============================================================
-if (!hasAnyChoice) {
-    // 선택지가 없으면 주관식으로 처리 (객관식으로 변환하지 않음)
-    var answerVal = parsed.A || parsed.answer || parsed.정답 || '';
+// ========================================================================
+// BLOCK 0730: load50Questions (선택지 강화 + 텍스트 처리 + 주관식 지원)
+// ========================================================================
+let currentAbortController = null;
+
+async function load50Questions(uiStartNumber, retryCount = 0) {
+    const MAX_RETRIES = 3;
+    if (TOTAL_QUESTIONS === 0) await detectTotalQuestions();
     
-    // ★★★ 주관식 플래그 설정 (빈 choices 유지) ★★★
-    choices = {};  // 빈 객체 유지 - 주관식으로 인식됨
-    hasAnyChoice = false;  // 주관식 유지
+    if (currentAbortController) {
+        currentAbortController.abort();
+        LOG.debug('🛑 Previous request aborted');
+    }
+    currentAbortController = new AbortController();
     
-    console.log('📝 주관식 문제 감지 (선택지 없음) - 정답:', answerVal);
+    const timeoutId = setTimeout(() => {
+        if (currentAbortController) currentAbortController.abort();
+    }, 15000);
     
-    // 디버깅을 위해 정답 정보는 별도로 저장 (선택지로 변환하지 않음)
-    // 이미 parsed.A에 정답이 저장되어 있음
+    try {
+        var url = ORIGINAL_API_URL + '?start=' + uiStartNumber + '&limit=' + QUESTIONS_PER_SET;
+        console.log('📡 Requesting questions (direct):', url);
+        
+        var response = await fetch(url, { signal: currentAbortController.signal });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        
+        var text = await response.text();
+        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+            throw new Error('HTML response - check Apps Script URL');
+        }
+        
+        var data = JSON.parse(text);
+        console.log('📡 Response type:', typeof data);
+        console.log('📡 Is array?', Array.isArray(data));
+        
+        var questionsData = [];
+        
+        if (Array.isArray(data)) {
+            questionsData = data;
+            console.log('✅ Data is direct array, length:', questionsData.length);
+        } else if (data && typeof data === 'object') {
+            if (Array.isArray(data.data)) {
+                questionsData = data.data;
+                console.log('✅ Found data.data array, length:', questionsData.length);
+            } else if (Array.isArray(data.questions)) {
+                questionsData = data.questions;
+                console.log('✅ Found data.questions array, length:', questionsData.length);
+            } else if (Array.isArray(data.items)) {
+                questionsData = data.items;
+                console.log('✅ Found data.items array, length:', questionsData.length);
+            } else {
+                var keys = Object.keys(data);
+                if (keys.length > 0) {
+                    questionsData = keys.map(function(key) {
+                        var item = data[key];
+                        if (typeof item === 'object' && item !== null) {
+                            item._key = key;
+                            return item;
+                        }
+                        return { question: String(item), answer: '1', _key: key };
+                    });
+                    console.log('✅ Converted object to array, length:', questionsData.length);
+                }
+            }
+        }
+        
+        if (!Array.isArray(questionsData) || questionsData.length === 0) {
+            throw new Error('No question data received');
+        }
+        
+        console.log('✅ Processing ' + questionsData.length + ' questions');
+        
+        var processed = [];
+        for (var idx = 0; idx < questionsData.length; idx++) {
+            try {
+                var item = questionsData[idx];
+                var parsed = item;
+                
+                if (typeof item === 'string') {
+                    try { parsed = JSON.parse(item); } catch(e) { parsed = { question: item, answer: '1' }; }
+                }
+                if (!parsed || typeof parsed !== 'object') {
+                    parsed = { question: String(item), answer: '1' };
+                }
+                
+                // ============================================================
+                // ★★★ 1. 문제 텍스트 처리 (줄바꿈 보존) ★★★
+                // ============================================================
+                var questionText = parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx);
+                if (typeof questionText === 'string') {
+                    questionText = questionText.replace(/\n/g, '<br>');
+                }
+                
+                var passageText = parsed.passage || parsed.P || parsed.p || parsed.지문 || '';
+                if (typeof passageText === 'string') {
+                    passageText = passageText.replace(/\n/g, '<br>');
+                }
+                
+                // ============================================================
+                // ★★★ 2. 선택지 강화 파싱 ★★★
+                // ============================================================
+                var choices = {};
+                var hasAnyChoice = false;
+                
+                // 2-1. 직접 숫자 키 확인 (parsed['1'], parsed['2'] 등)
+                for (var ci = 1; ci <= 4; ci++) {
+                    var key = String(ci);
+                    var val = parsed[key];
+                    if (val !== undefined && val !== null && val !== '') {
+                        choices[key] = String(val);
+                        hasAnyChoice = true;
+                    }
+                }
+                
+                // 2-2. options 배열 확인
+                if (!hasAnyChoice && parsed.options && Array.isArray(parsed.options)) {
+                    for (var oi = 0; oi < parsed.options.length && oi < 4; oi++) {
+                        var opt = parsed.options[oi];
+                        if (opt !== undefined && opt !== null && opt !== '') {
+                            choices[String(oi + 1)] = String(opt);
+                            hasAnyChoice = true;
+                        }
+                    }
+                }
+                
+                // 2-3. choices 객체 확인
+                if (!hasAnyChoice && parsed.choices && typeof parsed.choices === 'object') {
+                    var choiceKeys = Object.keys(parsed.choices);
+                    for (var ck = 0; ck < choiceKeys.length; ck++) {
+                        var key = choiceKeys[ck];
+                        var val = parsed.choices[key];
+                        if (val !== undefined && val !== null && val !== '') {
+                            choices[key] = String(val);
+                            hasAnyChoice = true;
+                        }
+                    }
+                }
+                
+                // 2-4. A, B, C, D 키 확인 (대문자)
+                if (!hasAnyChoice) {
+                    var letterKeys = ['A', 'B', 'C', 'D'];
+                    for (var lk = 0; lk < letterKeys.length; lk++) {
+                        var key = letterKeys[lk];
+                        var val = parsed[key];
+                        if (val !== undefined && val !== null && val !== '') {
+                            choices[String(lk + 1)] = String(val);
+                            hasAnyChoice = true;
+                        }
+                    }
+                }
+                
+                // ============================================================
+                // ★★★ 2-5. 선택지가 없으면 주관식으로 처리 ★★★
+                // ============================================================
+                if (!hasAnyChoice) {
+                    // ★★★ 선택지를 생성하지 않고 주관식 유지 ★★★
+                    // 빈 choices 객체 유지 → isSubjectiveQuestion()에서 true 반환
+                    choices = {};
+                    hasAnyChoice = false;
+                    
+                    var answerVal = parsed.A || parsed.answer || parsed.정답 || '';
+                    console.log('📝 주관식 문제 감지 (선택지 없음) - 정답:', answerVal);
+                    // 참고: 정답은 parsed.A 또는 parsed.answer에 이미 저장됨
+                }
+                
+                // ============================================================
+                // ★★★ 3. 정답 파싱 ★★★
+                // ============================================================
+                var finalAnswer = '1';
+                if (parsed.A !== undefined && parsed.A !== null && parsed.A !== "") {
+                    finalAnswer = String(parsed.A).trim();
+                } else if (parsed.answer !== undefined && parsed.answer !== null && parsed.answer !== "") {
+                    finalAnswer = String(parsed.answer).trim();
+                } else if (parsed.정답 !== undefined && parsed.정답 !== null && parsed.정답 !== "") {
+                    finalAnswer = String(parsed.정답).trim();
+                } else if (parsed.a !== undefined && parsed.a !== null && parsed.a !== "") {
+                    finalAnswer = String(parsed.a).trim();
+                }
+                
+                // 정답이 알파벳(A, B, C, D)이면 숫자로 변환
+                var letterToNum = { 'A': '1', 'B': '2', 'C': '3', 'D': '4' };
+                if (letterToNum[finalAnswer.toUpperCase()]) {
+                    finalAnswer = letterToNum[finalAnswer.toUpperCase()];
+                }
+                
+                // 정답이 choices에 없으면 첫 번째 선택지로 설정 (객관식인 경우만)
+                if (hasAnyChoice && Object.keys(choices).length > 0) {
+                    if (!choices[finalAnswer] || choices[finalAnswer] === '' || choices[finalAnswer] === 'No options') {
+                        var firstKey = Object.keys(choices).filter(function(k) { 
+                            return choices[k] && choices[k] !== '' && choices[k] !== 'No options'; 
+                        })[0] || '1';
+                        finalAnswer = firstKey;
+                        console.warn('⚠️ 정답이 선택지에 없음 → 첫 번째 선택지로 설정: ' + firstKey);
+                    }
+                }
+                
+                var originalNumber = parsed.N || parsed.originalNumber || parsed.n || (uiStartNumber + idx);
+                var isLatex = parsed.latex || parsed.math || parsed.isMath || false;
+                
+                processed.push({
+                    N: originalNumber,
+                    question: questionText,
+                    passage: passageText,
+                    choices: choices,
+                    answer: finalAnswer,
+                    explanation: parsed.explanation || parsed.E || parsed.e || parsed.해설 || 'No explanation available.',
+                    graphic: parsed.graphic || parsed.G || parsed.g || parsed.그래픽 || parsed.P_graph || '',
+                    originalNumber: originalNumber,
+                    A: parsed.A || parsed.answer || parsed.정답 || '',
+                    latex: isLatex
+                });
+                
+                if (idx === 0) {
+                    console.log('📝 First question mapped:', processed[0]);
+                    console.log('📝 Choices:', choices);
+                    console.log('📝 Answer:', finalAnswer);
+                    console.log('📝 hasAnyChoice:', hasAnyChoice);
+                }
+            } catch(e) {
+                console.warn('⚠️ Parse error for item', idx, ':', e);
+            }
+        }
+        
+        if (processed.length === 0) {
+            throw new Error('No valid question data');
+        }
+        
+        console.log('✅ Successfully parsed ' + processed.length + ' questions');
+        console.log('📝 First question preview:', processed[0]);
+        return processed;
+        
+    } catch(err) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+            LOG.info('🛑 Request aborted or timeout');
+            if (retryCount < MAX_RETRIES) {
+                const delay = Math.pow(2, retryCount) * 1000;
+                console.warn(`🔄 재시도 ${retryCount + 1}/${MAX_RETRIES} (${delay}ms 대기)...`);
+                showToast(`데이터 로드 재시도 중... (${retryCount + 1}/${MAX_RETRIES})`, 'warn', 2000);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return load50Questions(uiStartNumber, retryCount + 1);
+            }
+            throw new Error('Timeout after retries');
+        }
+        if (retryCount < MAX_RETRIES) {
+            const delay = Math.pow(2, retryCount) * 1000;
+            console.warn(`🔄 재시도 ${retryCount + 1}/${MAX_RETRIES} (${delay}ms 대기)...`);
+            showToast(`데이터 로드 재시도 중... (${retryCount + 1}/${MAX_RETRIES})`, 'warn', 2000);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return load50Questions(uiStartNumber, retryCount + 1);
+        }
+        console.error('❌ Load failed after', MAX_RETRIES, 'retries:', err);
+        showToast('문제 데이터를 불러오지 못했습니다. 다시 시도해주세요.', 'error', 5000);
+        throw err;
+    }
 }
 // ========================================================================
 // BLOCK 0800: 유틸리티 함수 (완전체)
