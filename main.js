@@ -792,203 +792,21 @@ async function detectTotalQuestions() {
     return TOTAL_QUESTIONS;
 }
 
-// ========================================================================
-// BLOCK 0730: load50Questions (타임아웃 + 재시도 + choices 강화)
-// ========================================================================
-let currentAbortController = null;
-
-async function load50Questions(uiStartNumber, retryCount = 0) {
-    const MAX_RETRIES = 3;
-    if (TOTAL_QUESTIONS === 0) await detectTotalQuestions();
+// ============================================================
+// ★★★ 2-5. 선택지가 없으면 주관식으로 처리 ★★★
+// ============================================================
+if (!hasAnyChoice) {
+    // 선택지가 없으면 주관식으로 처리 (객관식으로 변환하지 않음)
+    var answerVal = parsed.A || parsed.answer || parsed.정답 || '';
     
-    if (currentAbortController) {
-        currentAbortController.abort();
-        LOG.debug('🛑 Previous request aborted');
-    }
-    currentAbortController = new AbortController();
+    // ★★★ 주관식 플래그 설정 (빈 choices 유지) ★★★
+    choices = {};  // 빈 객체 유지 - 주관식으로 인식됨
+    hasAnyChoice = false;  // 주관식 유지
     
-    const timeoutId = setTimeout(() => {
-        if (currentAbortController) currentAbortController.abort();
-    }, 15000);
+    console.log('📝 주관식 문제 감지 (선택지 없음) - 정답:', answerVal);
     
-    try {
-        var url = ORIGINAL_API_URL + '?start=' + uiStartNumber + '&limit=' + QUESTIONS_PER_SET;
-        console.log('📡 Requesting questions (direct):', url);
-        
-        var response = await fetch(url, { signal: currentAbortController.signal });
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        
-        var text = await response.text();
-        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-            throw new Error('HTML response - check Apps Script URL');
-        }
-        
-        var data = JSON.parse(text);
-        console.log('📡 Response type:', typeof data);
-        console.log('📡 Is array?', Array.isArray(data));
-        
-        var questionsData = [];
-        
-        if (Array.isArray(data)) {
-            questionsData = data;
-            console.log('✅ Data is direct array, length:', questionsData.length);
-        } else if (data && typeof data === 'object') {
-            if (Array.isArray(data.data)) {
-                questionsData = data.data;
-                console.log('✅ Found data.data array, length:', questionsData.length);
-            } else if (Array.isArray(data.questions)) {
-                questionsData = data.questions;
-                console.log('✅ Found data.questions array, length:', questionsData.length);
-            } else if (Array.isArray(data.items)) {
-                questionsData = data.items;
-                console.log('✅ Found data.items array, length:', questionsData.length);
-            } else {
-                var keys = Object.keys(data);
-                if (keys.length > 0) {
-                    questionsData = keys.map(function(key) {
-                        var item = data[key];
-                        if (typeof item === 'object' && item !== null) {
-                            item._key = key;
-                            return item;
-                        }
-                        return { question: String(item), answer: '1', _key: key };
-                    });
-                    console.log('✅ Converted object to array, length:', questionsData.length);
-                }
-            }
-        }
-        
-        if (!Array.isArray(questionsData) || questionsData.length === 0) {
-            throw new Error('No question data received');
-        }
-        
-        console.log('✅ Processing ' + questionsData.length + ' questions');
-        
-        var processed = [];
-        for (var idx = 0; idx < questionsData.length; idx++) {
-            try {
-                var item = questionsData[idx];
-                var parsed = item;
-                
-                if (typeof item === 'string') {
-                    try { parsed = JSON.parse(item); } catch(e) { parsed = { question: item, answer: '1' }; }
-                }
-                if (!parsed || typeof parsed !== 'object') {
-                    parsed = { question: String(item), answer: '1' };
-                }
-                
-                var questionText = parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx);
-                var passageText = parsed.passage || parsed.P || parsed.p || parsed.지문 || '';
-                
-                var choices = {};
-                var hasAnyChoice = false;
-                for (var ci = 1; ci <= 4; ci++) {
-                    var key = String(ci);
-                    var val = parsed[key];
-                    if (val !== undefined && val !== null && val !== '') {
-                        choices[key] = String(val);
-                        hasAnyChoice = true;
-                    }
-                }
-                if (!hasAnyChoice && parsed.options && Array.isArray(parsed.options)) {
-                    for (var oi = 0; oi < parsed.options.length && oi < 4; oi++) {
-                        var opt = parsed.options[oi];
-                        if (opt !== undefined && opt !== null && opt !== '') {
-                            choices[String(oi + 1)] = String(opt);
-                            hasAnyChoice = true;
-                        }
-                    }
-                }
-                if (!hasAnyChoice && parsed.choices && typeof parsed.choices === 'object') {
-                    var choiceKeys = Object.keys(parsed.choices);
-                    for (var ck = 0; ck < choiceKeys.length; ck++) {
-                        var key = choiceKeys[ck];
-                        var val = parsed.choices[key];
-                        if (val !== undefined && val !== null && val !== '') {
-                            choices[key] = String(val);
-                            hasAnyChoice = true;
-                        }
-                    }
-                }
-                if (!hasAnyChoice) {
-                    choices = { '1': 'Option A', '2': 'Option B', '3': 'Option C', '4': 'Option D' };
-                    console.warn('⚠️ No choices found for question ' + idx + ', using defaults');
-                }
-                
-                var finalAnswer = '1';
-                if (parsed.A !== undefined && parsed.A !== null && parsed.A !== "") {
-                    finalAnswer = String(parsed.A).trim();
-                } else if (parsed.answer !== undefined && parsed.answer !== null && parsed.answer !== "") {
-                    finalAnswer = String(parsed.answer).trim();
-                } else if (parsed.정답 !== undefined && parsed.정답 !== null && parsed.정답 !== "") {
-                    finalAnswer = String(parsed.정답).trim();
-                } else if (parsed.a !== undefined && parsed.a !== null && parsed.a !== "") {
-                    finalAnswer = String(parsed.a).trim();
-                }
-                if (!choices[finalAnswer] && hasAnyChoice) {
-                    var firstKey = Object.keys(choices)[0] || '1';
-                    finalAnswer = firstKey;
-                    console.warn('⚠️ Answer not in choices, using first: ' + firstKey);
-                }
-                
-                var originalNumber = parsed.N || parsed.originalNumber || parsed.n || (uiStartNumber + idx);
-                
-                processed.push({
-                    N: originalNumber,
-                    question: questionText,
-                    passage: passageText,
-                    choices: choices,
-                    answer: finalAnswer,
-                    explanation: parsed.explanation || parsed.E || parsed.e || parsed.해설 || 'No explanation available.',
-                    graphic: parsed.graphic || parsed.G || parsed.g || parsed.그래픽 || parsed.P_graph || '',
-                    originalNumber: originalNumber,
-                    A: parsed.A || parsed.answer || parsed.정답 || ''
-                });
-                
-                if (idx === 0) {
-                    console.log('📝 First question mapped:', processed[0]);
-                    console.log('📝 Choices:', choices);
-                    console.log('📝 Answer:', finalAnswer);
-                }
-            } catch(e) {
-                console.warn('⚠️ Parse error for item', idx, ':', e);
-            }
-        }
-        
-        if (processed.length === 0) {
-            throw new Error('No valid question data');
-        }
-        
-        console.log('✅ Successfully parsed ' + processed.length + ' questions');
-        console.log('📝 First question preview:', processed[0]);
-        return processed;
-        
-    } catch(err) {
-        clearTimeout(timeoutId);
-        if (err.name === 'AbortError') {
-            LOG.info('🛑 Request aborted or timeout');
-            if (retryCount < MAX_RETRIES) {
-                const delay = Math.pow(2, retryCount) * 1000;
-                console.warn(`🔄 재시도 ${retryCount + 1}/${MAX_RETRIES} (${delay}ms 대기)...`);
-                showToast(`데이터 로드 재시도 중... (${retryCount + 1}/${MAX_RETRIES})`, 'warn', 2000);
-                await new Promise(resolve => setTimeout(resolve, delay));
-                return load50Questions(uiStartNumber, retryCount + 1);
-            }
-            throw new Error('Timeout after retries');
-        }
-        if (retryCount < MAX_RETRIES) {
-            const delay = Math.pow(2, retryCount) * 1000;
-            console.warn(`🔄 재시도 ${retryCount + 1}/${MAX_RETRIES} (${delay}ms 대기)...`);
-            showToast(`데이터 로드 재시도 중... (${retryCount + 1}/${MAX_RETRIES})`, 'warn', 2000);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return load50Questions(uiStartNumber, retryCount + 1);
-        }
-        console.error('❌ Load failed after', MAX_RETRIES, 'retries:', err);
-        showToast('문제 데이터를 불러오지 못했습니다. 다시 시도해주세요.', 'error', 5000);
-        throw err;
-    }
+    // 디버깅을 위해 정답 정보는 별도로 저장 (선택지로 변환하지 않음)
+    // 이미 parsed.A에 정답이 저장되어 있음
 }
 // ========================================================================
 // BLOCK 0800: 유틸리티 함수 (완전체)
