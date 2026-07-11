@@ -1562,11 +1562,11 @@ function autoWrapLatex(text) {
     
     // 1. 일반 텍스트 패턴 (먼저 체크 - 통과시키기)
     const textPatterns = [
-        /^[A-Z][a-z]+(?:[ ][A-Z][a-z]+)*$/,                    
-        /^[A-Z][a-z]+(?:[ ][A-Z][a-z]+)*[.!?]?$/,              
-        /^[A-Za-z0-9\s,.'"!?\-]+$/,                            
+        /^[A-Z][a-z]+(?:[ ][A-Z][a-z]+)*$/,
+        /^[A-Z][a-z]+(?:[ ][A-Z][a-z]+)*[.!?]?$/,
+        /^[A-Za-z0-9\s,.'"!?\-]+$/,
         /^[0-9]+(?:\.[0-9]+)?\s*(?:km|m|kg|mi|ft|in|cm|mm|해리|킬로미터)s?$/,
-        /^[A-Za-z]+\s+[A-Za-z]+\s+[A-Za-z]+/,                  
+        /^[A-Za-z]+\s+[A-Za-z]+\s+[A-Za-z]+/,
         /^(?:to|for|of|with|from|by|in|at|on|and|or|but|nor|for|yet|so)\s/i,
         /^[A-Z][a-z]+(?:[ ][A-Z][a-z]+)*[;:]/,
         /^[A-Z][a-z]+[,]/,
