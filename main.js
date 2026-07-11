@@ -793,8 +793,10 @@ async function detectTotalQuestions() {
 }
 
 // ========================================================================
-// BLOCK 0730: load50Questions (선택지 강화 + 텍스트 처리)
+// BLOCK 0730: load50Questions (타임아웃 + 재시도 + choices 강화)
 // ========================================================================
+let currentAbortController = null;
+
 async function load50Questions(uiStartNumber, retryCount = 0) {
     const MAX_RETRIES = 3;
     if (TOTAL_QUESTIONS === 0) await detectTotalQuestions();
@@ -877,27 +879,11 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     parsed = { question: String(item), answer: '1' };
                 }
                 
-                // ============================================================
-                // ★★★ 1. 문제 텍스트 처리 (줄바꿈 보존) ★★★
-                // ============================================================
                 var questionText = parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx);
-                // 줄바꿈 문자 보존 (HTML에서 <br>로 변환)
-                if (typeof questionText === 'string') {
-                    questionText = questionText.replace(/\n/g, '<br>');
-                }
-                
                 var passageText = parsed.passage || parsed.P || parsed.p || parsed.지문 || '';
-                if (typeof passageText === 'string') {
-                    passageText = passageText.replace(/\n/g, '<br>');
-                }
                 
-                // ============================================================
-                // ★★★ 2. 선택지 강화 파싱 ★★★
-                // ============================================================
                 var choices = {};
                 var hasAnyChoice = false;
-                
-                // 2-1. 직접 숫자 키 확인 (parsed['1'], parsed['2'] 등)
                 for (var ci = 1; ci <= 4; ci++) {
                     var key = String(ci);
                     var val = parsed[key];
@@ -906,8 +892,6 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                         hasAnyChoice = true;
                     }
                 }
-                
-                // 2-2. options 배열 확인
                 if (!hasAnyChoice && parsed.options && Array.isArray(parsed.options)) {
                     for (var oi = 0; oi < parsed.options.length && oi < 4; oi++) {
                         var opt = parsed.options[oi];
@@ -917,8 +901,6 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                         }
                     }
                 }
-                
-                // 2-3. choices 객체 확인
                 if (!hasAnyChoice && parsed.choices && typeof parsed.choices === 'object') {
                     var choiceKeys = Object.keys(parsed.choices);
                     for (var ck = 0; ck < choiceKeys.length; ck++) {
@@ -930,64 +912,11 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                         }
                     }
                 }
-                
-                // 2-4. A, B, C, D 키 확인 (대문자)
                 if (!hasAnyChoice) {
-                    var letterKeys = ['A', 'B', 'C', 'D'];
-                    for (var lk = 0; lk < letterKeys.length; lk++) {
-                        var key = letterKeys[lk];
-                        var val = parsed[key];
-                        if (val !== undefined && val !== null && val !== '') {
-                            choices[String(lk + 1)] = String(val);
-                            hasAnyChoice = true;
-                        }
-                    }
+                    choices = { '1': 'Option A', '2': 'Option B', '3': 'Option C', '4': 'Option D' };
+                    console.warn('⚠️ No choices found for question ' + idx + ', using defaults');
                 }
                 
-                // 2-5. ★★★ 선택지가 없으면 기본값 생성 ★★★
-                if (!hasAnyChoice) {
-                    // 정답이 있으면 정답을 선택지로 표시
-                    var answerVal = parsed.A || parsed.answer || parsed.정답 || '';
-                    if (answerVal) {
-                        choices = {
-                            '1': 'A. ' + String(answerVal),
-                            '2': 'B. ' + String(answerVal),
-                            '3': 'C. ' + String(answerVal),
-                            '4': 'D. ' + String(answerVal)
-                        };
-                        // 정답이 숫자면 해당 선택지에만 표시
-                        var ansNum = parseInt(answerVal);
-                        if (!isNaN(ansNum) && ansNum >= 1 && ansNum <= 4) {
-                            choices = {
-                                '1': 'A. ' + (ansNum === 1 ? String(answerVal) : ''),
-                                '2': 'B. ' + (ansNum === 2 ? String(answerVal) : ''),
-                                '3': 'C. ' + (ansNum === 3 ? String(answerVal) : ''),
-                                '4': 'D. ' + (ansNum === 4 ? String(answerVal) : '')
-                            };
-                            // 빈 선택지 채우기
-                            for (var ci = 1; ci <= 4; ci++) {
-                                if (!choices[String(ci)] || choices[String(ci)] === '') {
-                                    choices[String(ci)] = String.fromCharCode(64 + ci) + '. ';
-                                }
-                            }
-                        } else {
-                            // 정답이 텍스트면 모든 선택지에 동일하게 표시
-                            for (var ci = 1; ci <= 4; ci++) {
-                                choices[String(ci)] = String.fromCharCode(64 + ci) + '. ' + String(answerVal);
-                            }
-                        }
-                        hasAnyChoice = true;
-                        console.warn('⚠️ 선택지 없음 → 정답 기반 기본 선택지 생성');
-                    } else {
-                        // 완전히 선택지가 없으면 주관식 처리
-                        choices = { '1': 'No options' };
-                        console.warn('⚠️ 선택지 없음 → 주관식으로 처리');
-                    }
-                }
-                
-                // ============================================================
-                // ★★★ 3. 정답 파싱 ★★★
-                // ============================================================
                 var finalAnswer = '1';
                 if (parsed.A !== undefined && parsed.A !== null && parsed.A !== "") {
                     finalAnswer = String(parsed.A).trim();
@@ -998,24 +927,13 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 } else if (parsed.a !== undefined && parsed.a !== null && parsed.a !== "") {
                     finalAnswer = String(parsed.a).trim();
                 }
-                
-                // 정답이 알파벳(A, B, C, D)이면 숫자로 변환
-                var letterToNum = { 'A': '1', 'B': '2', 'C': '3', 'D': '4' };
-                if (letterToNum[finalAnswer.toUpperCase()]) {
-                    finalAnswer = letterToNum[finalAnswer.toUpperCase()];
-                }
-                
-                // 정답이 choices에 없으면 첫 번째 선택지로 설정
-                if (!choices[finalAnswer] || choices[finalAnswer] === '' || choices[finalAnswer] === 'No options') {
-                    var firstKey = Object.keys(choices).filter(function(k) { 
-                        return choices[k] && choices[k] !== '' && choices[k] !== 'No options'; 
-                    })[0] || '1';
+                if (!choices[finalAnswer] && hasAnyChoice) {
+                    var firstKey = Object.keys(choices)[0] || '1';
                     finalAnswer = firstKey;
-                    console.warn('⚠️ 정답이 선택지에 없음 → 첫 번째 선택지로 설정: ' + firstKey);
+                    console.warn('⚠️ Answer not in choices, using first: ' + firstKey);
                 }
                 
                 var originalNumber = parsed.N || parsed.originalNumber || parsed.n || (uiStartNumber + idx);
-                var isLatex = parsed.latex || parsed.math || parsed.isMath || false;
                 
                 processed.push({
                     N: originalNumber,
@@ -1026,8 +944,7 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     explanation: parsed.explanation || parsed.E || parsed.e || parsed.해설 || 'No explanation available.',
                     graphic: parsed.graphic || parsed.G || parsed.g || parsed.그래픽 || parsed.P_graph || '',
                     originalNumber: originalNumber,
-                    A: parsed.A || parsed.answer || parsed.정답 || '',
-                    latex: isLatex
+                    A: parsed.A || parsed.answer || parsed.정답 || ''
                 });
                 
                 if (idx === 0) {
@@ -1113,7 +1030,7 @@ function getValidChoiceKeys(choices) {
 }
 
 // ========================================================================
-// BLOCK 0840: hasRealChoices (객관식 감지 강화)
+// BLOCK 0840: hasRealChoices (기존 코드 유지 + 추가 함수들과 통합)
 // ========================================================================
 function hasRealChoices(q) {
     if (!q || !q.choices) return false;
@@ -1131,33 +1048,33 @@ function hasRealChoices(q) {
             trimmed.toLowerCase() !== 'no options.' && 
             trimmed !== 'No options' &&
             trimmed !== 'none' &&
-            trimmed !== 'N/A' &&
-            trimmed !== 'A. ' &&
-            trimmed !== 'B. ' &&
-            trimmed !== 'C. ' &&
-            trimmed !== 'D. ') {
+            trimmed !== 'N/A') {
             hasNonEmptyChoice = true;
             break;
         }
     }
     if (!hasNonEmptyChoice) return false;
     
-    // ★★★ 객관식 판단 조건 ★★★
-    var has1 = q.choices['1'] && q.choices['1'].trim() !== '' && q.choices['1'].trim() !== 'A. ' && q.choices['1'].trim() !== 'No options';
-    var has2 = q.choices['2'] && q.choices['2'].trim() !== '' && q.choices['2'].trim() !== 'B. ' && q.choices['2'].trim() !== 'No options';
-    var has3 = q.choices['3'] && q.choices['3'].trim() !== '' && q.choices['3'].trim() !== 'C. ' && q.choices['3'].trim() !== 'No options';
-    var has4 = q.choices['4'] && q.choices['4'].trim() !== '' && q.choices['4'].trim() !== 'D. ' && q.choices['4'].trim() !== 'No options';
+    var has1 = q.choices['1'] && q.choices['1'].trim() !== '';
+    var has2 = q.choices['2'] && q.choices['2'].trim() !== '';
+    var has3 = q.choices['3'] && q.choices['3'].trim() !== '';
+    var has4 = q.choices['4'] && q.choices['4'].trim() !== '';
+    
+    var hasLetterChoices = false;
+    var choiceKeys = Object.keys(q.choices);
+    for (var j = 0; j < choiceKeys.length; j++) {
+        var key = choiceKeys[j];
+        var val = q.choices[key];
+        if (typeof val === 'string' && val.trim() !== '') {
+            if (/^[A-Da-d][)\\.]/.test(val.trim())) {
+                hasLetterChoices = true;
+                break;
+            }
+        }
+    }
     
     var choiceCount = Object.keys(q.choices).filter(function(k) {
-        var val = q.choices[k];
-        if (typeof val !== 'string') val = String(val);
-        var trimmed = val.trim();
-        return trimmed !== "" && 
-               trimmed !== 'No options' && 
-               trimmed !== 'A. ' && 
-               trimmed !== 'B. ' && 
-               trimmed !== 'C. ' && 
-               trimmed !== 'D. ';
+        return q.choices[k] && q.choices[k].trim() !== '';
     }).length;
     
     var answerIsNumeric = false;
@@ -1168,14 +1085,15 @@ function hasRealChoices(q) {
         }
     }
     
-    // ★★★ 더 완화된 객관식 판단 ★★★
-    var isMultipleChoice = (has1 || has2 || has3 || has4) || 
-                           choiceCount >= 2 ||
-                           (answerIsNumeric && choiceCount >= 1);
+    var isMultipleChoice = (has1 && has2 && has3 && has4) || 
+                           hasLetterChoices || 
+                           choiceCount >= 3 ||
+                           (answerIsNumeric && choiceCount >= 2);
     
     if (isMultipleChoice) {
         console.log('📋 객관식 감지:', {
             has1_2_3_4: has1 && has2 && has3 && has4,
+            hasLetterChoices: hasLetterChoices,
             choiceCount: choiceCount,
             answerIsNumeric: answerIsNumeric,
             choices: q.choices
@@ -1596,7 +1514,6 @@ function autoWrapLatex(text) {
     
     return text;
 }
-
 
 // ========================================================================
 // BLOCK 1120: detectMathQuestion (수학 문제 감지)
@@ -3453,44 +3370,6 @@ async function startQuizWithNumber(uiStartNumber) {
     console.error(err);
   }
 }
-
-
-/* 문제 텍스트 줄바꿈 처리 */
-#questionContainer .question-text {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    white-space: normal;
-    max-width: 100%;
-    line-height: 1.6;
-}
-
-/* 지문 텍스트 줄바꿈 */
-#questionContainer .passage-text {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    white-space: normal;
-    max-width: 100%;
-    line-height: 1.8;
-}
-
-/* 선택지 텍스트 줄바꿈 */
-#questionContainer .choice .math-content {
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    white-space: normal;
-}
-
-/* 모바일 대응 */
-@media (max-width: 768px) {
-    #questionContainer .question-text {
-        font-size: 15px;
-        line-height: 1.5;
-    }
-    #questionContainer .choice .math-content {
-        font-size: 14px;
-    }
-}
-
 
 // ========================================================================
 // BLOCK 1510: 시스템 초기화 (원본 B012 initialize)
