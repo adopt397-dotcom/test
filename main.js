@@ -1,9 +1,9 @@
 // ========================================================================
-// BLOCK 0000: 시스템 메타 정보
+// BLOCK 0000: 시스템 메타 정보  
 // ========================================================================
-// 버전: 6.0.0
+// 버전: 6.10.1
 // 날짜: 2026-07-11
-// 설명: SAT 디지털 퀴즈 시스템 + 한 줄 JSON 기반 Graphic Schema v6.0
+// 설명: 운영 main.js 기반 + Equation Engine + Geometry 2D Engine + ES Module 통합
 // ========================================================================
 
 // ========================================================================
@@ -2016,11 +2016,9 @@ function renderShapeType(parsedData) {
     return html;
 }
 
-
 // ========================================================================
-// BLOCK 1230: Geometry 2D Engine v2.1 (자기 등록형 완성본)
-// 사용법: 기존 BLOCK 1230 전체를 이 블록으로 교체하면 끝.
-// 별도의 switch 수정 / window 등록 수정이 필요하지 않음.
+// BLOCK 1230: Geometry 2D Engine v2.2 (ES Module 통합형)
+// main.js v6.10 통합 버전: Dispatcher/Export/전역 노출과 함께 연결됨.
 // ========================================================================
 
 function geometry2DSafeNumber(value, fallback) {
@@ -2499,62 +2497,6 @@ function renderGeometry2D(parsedData) {
 
     return html;
 }
-
-// ------------------------------------------------------------------------
-// 자기 등록부
-// 이 블록 하나만 교체해도 geometry-2d 타입이 renderGraphic에 연결된다.
-// ------------------------------------------------------------------------
-
-var geometry2DOriginalRenderGraphic = renderGraphic;
-
-renderGraphic = function(jsonData) {
-    var parsedData = null;
-
-    try {
-        if (jsonData && typeof jsonData === 'object') {
-            parsedData = jsonData;
-        } else if (typeof jsonData === 'string' && jsonData.trim() !== '') {
-            var raw = jsonData.trim();
-
-            if (raw.startsWith('"') && raw.endsWith('"')) {
-                raw = raw.slice(1, -1);
-            }
-
-            raw = raw.replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-            parsedData = JSON.parse(raw);
-        }
-    } catch (error) {
-        parsedData = null;
-    }
-
-    var type = parsedData && parsedData.type
-        ? String(parsedData.type).toLowerCase()
-        : '';
-
-    if (
-        type === 'geometry-2d' ||
-        type === 'geometry2d' ||
-        type === 'geometry'
-    ) {
-        return renderGeometry2D(parsedData);
-    }
-
-    return geometry2DOriginalRenderGraphic(jsonData);
-};
-
-// 전역 노출도 이 블록 안에서 처리
-window.renderGeometry2D = renderGeometry2D;
-window.renderGraphic = renderGraphic;
-
-console.log('✅ BLOCK 1230 Geometry 2D Engine v2.1 registered');
-// ========================================================================
-// END BLOCK 1230
-// ========================================================================
-
-
-
-
-
 
 // ========================================================================
 // BLOCK 1231: 함수 평가기
@@ -3618,7 +3560,7 @@ function renderChartWithChartJS(parsedData, chartId) {
 // ========================================================================
 // BLOCK 1280: 메인 renderGraphic 함수 (SAT 모든 타입 통합)
 // ========================================================================
-function renderGraphicLegacy(jsonData) {
+function renderGraphic(jsonData) {
     // 1️⃣ JSON 문자열이 아니면 변환
     if (typeof jsonData === 'object' && jsonData !== null) {
         jsonData = JSON.stringify(jsonData);
@@ -3729,6 +3671,10 @@ function renderGraphicLegacy(jsonData) {
             return renderGraphicType(parsedData);
         case 'shape':
             return renderShapeType(parsedData);
+        case 'geometry-2d':
+        case 'geometry2d':
+        case 'geometry':
+            return renderGeometry2D(parsedData);
         case 'equation-graph':
         case 'equation':
         case 'linear-graph':
@@ -3767,673 +3713,6 @@ function renderGraphicLegacy(jsonData) {
                 '</div>';
     }
 }
-
-// ========================================================================
-// BLOCK 1285: SAT Graphic Schema v6.0 Core
-// 목적: Google Sheets 한 셀의 한 줄 JSON으로 변수·파생값·그래픽을 함께 정의
-// 표준: {"v":6,"template":"...","vars":{},"derive":{},"graphic":{}}
-// ========================================================================
-
-const GRAPHIC_V6 = {
-    version: 6,
-    schema: 'sat-g6',
-    supportedTypes: [
-        'equation-graph', 'chart-v2', 'table-v2', 'dot-plot-v2',
-        'number-line-v2', 'geometry-2d', 'geometry-3d', 'diagram-v2'
-    ]
-};
-
-function parseGraphicPayloadV6(input) {
-    if (input && typeof input === 'object') return { ok: true, value: input };
-    if (input === null || input === undefined || String(input).trim() === '') {
-        return { ok: false, empty: true, error: 'Empty graphic data' };
-    }
-    var raw = String(input).trim();
-    var candidates = [raw];
-    if (raw.startsWith('"') && raw.endsWith('"')) candidates.push(raw.slice(1, -1));
-    candidates.push(raw.replace(/\\"/g, '"').replace(/\\\\/g, '\\'));
-    for (var i = 0; i < candidates.length; i++) {
-        try {
-            var parsed = JSON.parse(candidates[i]);
-            if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-            return { ok: true, value: parsed };
-        } catch (e) {}
-    }
-    return { ok: false, error: 'Invalid one-line JSON' };
-}
-
-function isGraphicV6(data) {
-    return !!(data && typeof data === 'object' &&
-        (Number(data.v) === 6 || data.schema === 'sat-g6' || data.schema === 'graphic-v6'));
-}
-
-function cloneGraphicDataV6(value) {
-    if (value === undefined) return undefined;
-    return JSON.parse(JSON.stringify(value));
-}
-
-function getPathValueV6(scope, path) {
-    var parts = String(path || '').trim().split('.');
-    var value = scope;
-    for (var i = 0; i < parts.length; i++) {
-        if (!parts[i]) continue;
-        if (value === null || value === undefined || !Object.prototype.hasOwnProperty.call(value, parts[i])) {
-            return undefined;
-        }
-        value = value[parts[i]];
-    }
-    return value;
-}
-
-function normalizeDerivedExpressionV6(expression) {
-    return String(expression == null ? '' : expression)
-        .trim()
-        .replace(/[−–—]/g, '-')
-        .replace(/×/g, '*')
-        .replace(/÷/g, '/')
-        .replace(/²/g, '^2')
-        .replace(/³/g, '^3')
-        .replace(/π/g, 'pi');
-}
-
-function evaluateDerivedExpressionV6(expression, scope) {
-    var source = normalizeDerivedExpressionV6(expression);
-    if (!source) return null;
-
-    var names = Object.keys(scope || {}).filter(function(name) {
-        return /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && typeof scope[name] !== 'object';
-    });
-    var values = names.map(function(name) { return scope[name]; });
-
-    if (typeof math !== 'undefined' && math.evaluate) {
-        var mathScope = Object.assign({}, scope || {});
-        return math.evaluate(source, mathScope);
-    }
-
-    var js = source
-        .replace(/\^/g, '**')
-        .replace(/\bpi\b/gi, 'Math.PI')
-        .replace(/\babs\s*\(/gi, 'Math.abs(')
-        .replace(/\bsqrt\s*\(/gi, 'Math.sqrt(')
-        .replace(/\bpow\s*\(/gi, 'Math.pow(')
-        .replace(/\bmin\s*\(/gi, 'Math.min(')
-        .replace(/\bmax\s*\(/gi, 'Math.max(')
-        .replace(/\bround\s*\(/gi, 'Math.round(')
-        .replace(/\bfloor\s*\(/gi, 'Math.floor(')
-        .replace(/\bceil\s*\(/gi, 'Math.ceil(')
-        .replace(/\bsin\s*\(/gi, 'Math.sin(')
-        .replace(/\bcos\s*\(/gi, 'Math.cos(')
-        .replace(/\btan\s*\(/gi, 'Math.tan(')
-        .replace(/\blog\s*\(/gi, 'Math.log(')
-        .replace(/\bexp\s*\(/gi, 'Math.exp(');
-
-    if (!/^[0-9A-Za-z_+\-*/%().,\s*]+$/.test(js)) {
-        throw new Error('Unsafe derived expression: ' + expression);
-    }
-    var fn = Function.apply(null, names.concat(['"use strict"; return (' + js + ');']));
-    return fn.apply(null, values);
-}
-
-function buildGraphicScopeV6(spec) {
-    var scope = Object.assign({}, spec.vars || spec.variables || {});
-    var derived = spec.derive || spec.derived || {};
-    Object.keys(derived).forEach(function(key) {
-        var definition = derived[key];
-        try {
-            scope[key] = (typeof definition === 'string')
-                ? evaluateDerivedExpressionV6(definition, scope)
-                : cloneGraphicDataV6(definition);
-        } catch (error) {
-            throw new Error('derive.' + key + ': ' + error.message);
-        }
-    });
-    return scope;
-}
-
-function resolveTemplateStringV6(text, scope) {
-    var exact = String(text).match(/^\{([A-Za-z_][A-Za-z0-9_.]*)\}$/);
-    if (exact) {
-        var exactValue = getPathValueV6(scope, exact[1]);
-        if (exactValue !== undefined) return cloneGraphicDataV6(exactValue);
-    }
-
-    var replaced = String(text).replace(/\{([A-Za-z_][A-Za-z0-9_.]*)\}/g, function(match, path) {
-        var value = getPathValueV6(scope, path);
-        if (value === undefined) return match;
-        if (typeof value === 'object') return JSON.stringify(value);
-        return String(value);
-    });
-
-    if (replaced.charAt(0) === '=') {
-        return evaluateDerivedExpressionV6(replaced.slice(1), scope);
-    }
-    return replaced;
-}
-
-function resolveGraphicValueV6(value, scope) {
-    if (typeof value === 'string') return resolveTemplateStringV6(value, scope);
-    if (Array.isArray(value)) return value.map(function(item) { return resolveGraphicValueV6(item, scope); });
-    if (value && typeof value === 'object') {
-        var output = {};
-        Object.keys(value).forEach(function(key) {
-            output[key] = resolveGraphicValueV6(value[key], scope);
-        });
-        return output;
-    }
-    return value;
-}
-
-function findUnresolvedTokensV6(value, path, results) {
-    path = path || 'graphic';
-    results = results || [];
-    if (typeof value === 'string') {
-        var matches = value.match(/\{[A-Za-z_][A-Za-z0-9_.]*\}/g);
-        if (matches) results.push(path + ': ' + matches.join(', '));
-    } else if (Array.isArray(value)) {
-        value.forEach(function(item, index) { findUnresolvedTokensV6(item, path + '[' + index + ']', results); });
-    } else if (value && typeof value === 'object') {
-        Object.keys(value).forEach(function(key) { findUnresolvedTokensV6(value[key], path + '.' + key, results); });
-    }
-    return results;
-}
-
-function validateGraphicV6(spec, resolvedGraphic) {
-    var errors = [];
-    var warnings = [];
-    if (!spec || typeof spec !== 'object') errors.push('Specification must be an object');
-    if (!resolvedGraphic || typeof resolvedGraphic !== 'object') errors.push('graphic must be an object');
-    var type = resolvedGraphic && resolvedGraphic.type;
-    if (!type) errors.push('graphic.type is required');
-    if (type && GRAPHIC_V6.supportedTypes.indexOf(type) < 0) warnings.push('Unregistered v6 type: ' + type);
-
-    findUnresolvedTokensV6(resolvedGraphic).forEach(function(item) {
-        errors.push('Unresolved variable at ' + item);
-    });
-
-    if (type === 'equation-graph') {
-        var equations = resolvedGraphic.equations || (resolvedGraphic.equation ? [resolvedGraphic.equation] : []);
-        var points = resolvedGraphic.points || [];
-        if ((!equations || equations.length === 0) && (!points || points.length === 0) && !(resolvedGraphic.segments || []).length) {
-            errors.push('equation-graph needs equations, points, or segments');
-        }
-    }
-    if (type === 'chart-v2') {
-        if (!resolvedGraphic.chart) errors.push('chart-v2 requires chart');
-        if (resolvedGraphic.chart !== 'scatter' && !(resolvedGraphic.categories || []).length) warnings.push('chart-v2 categories are empty');
-        if (!(resolvedGraphic.series || []).length) errors.push('chart-v2 requires series');
-    }
-    if (type === 'table-v2') {
-        if (!(resolvedGraphic.headers || []).length) errors.push('table-v2 requires headers');
-        if (!(resolvedGraphic.rows || []).length) errors.push('table-v2 requires rows');
-    }
-    if (type === 'dot-plot-v2' && !(resolvedGraphic.values || []).length) errors.push('dot-plot-v2 requires values');
-    if (type === 'number-line-v2' && !(resolvedGraphic.points || resolvedGraphic.values || []).length) warnings.push('number-line-v2 has no points');
-    if (type === 'geometry-2d' && !resolvedGraphic.shape && !resolvedGraphic.points && !resolvedGraphic.circles) warnings.push('geometry-2d has no shape data');
-    if (type === 'geometry-3d' && !resolvedGraphic.solid) errors.push('geometry-3d requires solid');
-    if (type === 'diagram-v2' && !(resolvedGraphic.objects || []).length) warnings.push('diagram-v2 has no objects');
-
-    return { valid: errors.length === 0, errors: errors, warnings: warnings };
-}
-
-function compileGraphicV6(spec) {
-    var scope = buildGraphicScopeV6(spec);
-    var graphicSource = spec.graphic || spec.render || {};
-    var graphic = resolveGraphicValueV6(graphicSource, scope);
-    var validation = validateGraphicV6(spec, graphic);
-    return {
-        scope: scope,
-        graphic: graphic,
-        validation: validation,
-        template: spec.template || '',
-        id: spec.id || spec.key || ''
-    };
-}
-
-function toOneLineGraphicJSON(value) {
-    return JSON.stringify(value);
-}
-
-function renderGraphicErrorV6(title, details) {
-    var list = Array.isArray(details) ? details : [details];
-    return '<div style="margin:15px 0;padding:14px;border:1px solid #e7b4b4;background:#fff7f7;border-radius:8px;color:#a33;">' +
-        '<strong>' + escapeHtml(title) + '</strong>' +
-        '<div style="margin-top:6px;font-size:13px;">' + list.map(escapeHtml).join('<br>') + '</div></div>';
-}
-
-function niceBoundsV6(min, max, includeZero) {
-    min = Number(min); max = Number(max);
-    if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: -10, max: 10, tick: 2 };
-    if (min === max) { min -= 1; max += 1; }
-    if (includeZero !== false) { min = Math.min(0, min); max = Math.max(0, max); }
-    var span = max - min;
-    var rawTick = span / 8;
-    var power = Math.pow(10, Math.floor(Math.log10(rawTick || 1)));
-    var fraction = rawTick / power;
-    var tick = (fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10) * power;
-    var padding = tick;
-    return {
-        min: Math.floor((min - padding * 0.15) / tick) * tick,
-        max: Math.ceil((max + padding * 0.15) / tick) * tick,
-        tick: tick
-    };
-}
-
-function applyEquationAutoAxesV6(graphic) {
-    var out = Object.assign({}, graphic);
-    out.xAxis = Object.assign({}, graphic.xAxis || {});
-    out.yAxis = Object.assign({}, graphic.yAxis || {});
-    var xs = [], ys = [];
-    (graphic.points || []).forEach(function(point) {
-        var x = Number(point.x), y = Number(point.y);
-        if (Number.isFinite(x)) xs.push(x);
-        if (Number.isFinite(y)) ys.push(y);
-    });
-
-    var equations = graphic.equations || (graphic.equation ? [graphic.equation] : []);
-    equations.forEach(function(item) {
-        var equation = typeof item === 'string' ? item : item.equation;
-        if (!equation) return;
-        try {
-            var compiled = compileEquationItem(equation);
-            if (compiled.relation.op !== '=') return;
-            var c = compiled.value(0, 0);
-            var a = compiled.value(1, 0) - c;
-            var b = compiled.value(0, 1) - c;
-            var test = compiled.value(2, 3);
-            if (Math.abs(test - (c + 2 * a + 3 * b)) > 1e-6) return;
-            if (Math.abs(a) > 1e-12) xs.push(-c / a);
-            if (Math.abs(b) > 1e-12) ys.push(-c / b);
-        } catch (e) {}
-    });
-
-    if (out.xAxis.min === 'auto' || out.xAxis.max === 'auto' || out.xAxis.tick === 'auto') {
-        var xb = niceBoundsV6(xs.length ? Math.min.apply(null, xs) : -10, xs.length ? Math.max.apply(null, xs) : 10, true);
-        if (out.xAxis.min === 'auto') out.xAxis.min = xb.min;
-        if (out.xAxis.max === 'auto') out.xAxis.max = xb.max;
-        if (out.xAxis.tick === 'auto') out.xAxis.tick = xb.tick;
-    }
-    if (out.yAxis.min === 'auto' || out.yAxis.max === 'auto' || out.yAxis.tick === 'auto') {
-        var yb = niceBoundsV6(ys.length ? Math.min.apply(null, ys) : -10, ys.length ? Math.max.apply(null, ys) : 10, true);
-        if (out.yAxis.min === 'auto') out.yAxis.min = yb.min;
-        if (out.yAxis.max === 'auto') out.yAxis.max = yb.max;
-        if (out.yAxis.tick === 'auto') out.yAxis.tick = yb.tick;
-    }
-    return out;
-}
-
-// ========================================================================
-// BLOCK 1286: Chart Engine v2 (Chart.js)
-// ========================================================================
-
-function wrapChartLabelV6(label, maxChars) {
-    var text = String(label == null ? '' : label);
-    maxChars = maxChars || 16;
-    if (text.length <= maxChars) return text;
-    var words = text.split(/\s+/);
-    var lines = [], line = '';
-    words.forEach(function(word) {
-        if (!line) line = word;
-        else if ((line + ' ' + word).length <= maxChars) line += ' ' + word;
-        else { lines.push(line); line = word; }
-    });
-    if (line) lines.push(line);
-    return lines;
-}
-
-function chartValueLabelPluginV6(showValues, suffix) {
-    return {
-        id: 'satValueLabelsV6_' + Math.random().toString(36).slice(2),
-        afterDatasetsDraw: function(chart) {
-            if (!showValues) return;
-            var ctx = chart.ctx;
-            ctx.save();
-            ctx.fillStyle = '#222';
-            ctx.font = '600 12px sans-serif';
-            chart.data.datasets.forEach(function(dataset, datasetIndex) {
-                var meta = chart.getDatasetMeta(datasetIndex);
-                if (meta.hidden) return;
-                meta.data.forEach(function(element, index) {
-                    var raw = dataset.data[index];
-                    var value = raw && typeof raw === 'object' ? (raw.y !== undefined ? raw.y : raw.x) : raw;
-                    if (!Number.isFinite(Number(value))) return;
-                    var position = element.tooltipPosition();
-                    var horizontal = chart.options.indexAxis === 'y';
-                    ctx.textAlign = horizontal ? 'left' : 'center';
-                    ctx.textBaseline = horizontal ? 'middle' : 'bottom';
-                    ctx.fillText(String(value) + (suffix || ''), position.x + (horizontal ? 6 : 0), position.y - (horizontal ? 0 : 5));
-                });
-            });
-            ctx.restore();
-        }
-    };
-}
-
-function buildChartConfigV6(data) {
-    var chartType = data.chart || 'bar';
-    var categories = data.categories || [];
-    var maxLabelLength = categories.reduce(function(max, item) { return Math.max(max, String(item).length); }, 0);
-    var orientation = data.orientation || 'auto';
-    if (orientation === 'auto') orientation = (categories.length >= 6 || maxLabelLength > 18) ? 'horizontal' : 'vertical';
-    var horizontal = orientation === 'horizontal';
-    var colors = ['#3498db', '#e74c3c', '#27ae60', '#f39c12', '#9b59b6', '#1abc9c', '#34495e'];
-
-    var datasets = (data.series || []).map(function(series, index) {
-        var color = series.color || colors[index % colors.length];
-        var values = series.values !== undefined ? series.values : (series.data || []);
-        var dataset = {
-            label: series.name || series.label || ('Series ' + (index + 1)),
-            data: values,
-            backgroundColor: series.backgroundColor || (chartType === 'line' ? color + '22' : color + 'AA'),
-            borderColor: series.borderColor || color,
-            borderWidth: safeNumber(series.borderWidth, chartType === 'line' ? 2.5 : 1.5)
-        };
-        if (chartType === 'line') {
-            dataset.tension = safeNumber(series.tension, 0.2);
-            dataset.pointRadius = safeNumber(series.pointRadius, 4);
-            dataset.fill = !!series.fill;
-        }
-        if (chartType === 'scatter') {
-            dataset.pointRadius = safeNumber(series.pointRadius, 5);
-            dataset.showLine = !!series.showLine;
-            dataset.tension = safeNumber(series.tension, 0.15);
-        }
-        if (series.stack) dataset.stack = series.stack;
-        return dataset;
-    });
-
-    var xAxis = data.xAxis || {};
-    var yAxis = data.yAxis || {};
-    var categoryLabels = categories.map(function(label) { return wrapChartLabelV6(label, horizontal ? 24 : 14); });
-    var config = {
-        type: chartType === 'scatter' ? 'scatter' : chartType,
-        data: { labels: chartType === 'scatter' ? undefined : categoryLabels, datasets: datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: horizontal && chartType === 'bar' ? 'y' : 'x',
-            animation: data.animation === false ? false : { duration: safeNumber(data.animationDuration, 250) },
-            plugins: {
-                title: { display: !!data.title, text: data.title || '', font: { size: 16, weight: 'bold' } },
-                legend: { display: data.legend !== false && datasets.length > 1, position: data.legendPosition || 'bottom' },
-                tooltip: { enabled: data.tooltip !== false }
-            },
-            scales: chartType === 'pie' || chartType === 'doughnut' ? {} : {
-                x: {
-                    type: chartType === 'scatter' || (horizontal && chartType === 'bar') ? 'linear' : 'category',
-                    beginAtZero: horizontal && chartType === 'bar' ? (yAxis.min === undefined || yAxis.min === 0 || yAxis.min === 'auto') : false,
-                    stacked: !!data.stacked,
-                    min: horizontal && chartType === 'bar'
-                        ? (yAxis.min !== undefined && yAxis.min !== 'auto' ? Number(yAxis.min) : undefined)
-                        : (xAxis.min !== undefined && xAxis.min !== 'auto' ? Number(xAxis.min) : undefined),
-                    max: horizontal && chartType === 'bar'
-                        ? (yAxis.max !== undefined && yAxis.max !== 'auto' ? Number(yAxis.max) : undefined)
-                        : (xAxis.max !== undefined && xAxis.max !== 'auto' ? Number(xAxis.max) : undefined),
-                    grid: { display: data.grid !== false, color: '#e3e3e3' },
-                    ticks: {
-                        stepSize: horizontal && chartType === 'bar'
-                            ? (yAxis.tick !== 'auto' ? yAxis.tick : undefined)
-                            : (xAxis.tick !== 'auto' ? xAxis.tick : undefined),
-                        autoSkip: false,
-                        maxRotation: 0
-                    },
-                    title: {
-                        display: horizontal && chartType === 'bar' ? !!yAxis.label : !!xAxis.label,
-                        text: horizontal && chartType === 'bar' ? (yAxis.label || '') : (xAxis.label || '')
-                    }
-                },
-                y: {
-                    type: horizontal && chartType === 'bar' ? 'category' : 'linear',
-                    beginAtZero: !(horizontal && chartType === 'bar') && (yAxis.min === undefined || yAxis.min === 0 || yAxis.min === 'auto'),
-                    stacked: !!data.stacked,
-                    min: horizontal && chartType === 'bar'
-                        ? undefined
-                        : (yAxis.min !== undefined && yAxis.min !== 'auto' ? Number(yAxis.min) : undefined),
-                    max: horizontal && chartType === 'bar'
-                        ? undefined
-                        : (yAxis.max !== undefined && yAxis.max !== 'auto' ? Number(yAxis.max) : undefined),
-                    grid: { display: data.grid !== false, color: '#e3e3e3' },
-                    ticks: { stepSize: horizontal && chartType === 'bar' ? undefined : (yAxis.tick !== 'auto' ? yAxis.tick : undefined), autoSkip: false },
-                    title: {
-                        display: horizontal && chartType === 'bar' ? !!xAxis.label : !!yAxis.label,
-                        text: horizontal && chartType === 'bar' ? (xAxis.label || '') : (yAxis.label || '')
-                    }
-                }
-            }
-        },
-        plugins: [chartValueLabelPluginV6(!!data.showValues, data.valueSuffix || '')]
-    };
-    if (chartType === 'pie' || chartType === 'doughnut') {
-        var first = datasets[0] || { data: [] };
-        first.backgroundColor = first.backgroundColor && Array.isArray(first.backgroundColor)
-            ? first.backgroundColor
-            : categories.map(function(_, index) { return colors[index % colors.length] + 'CC'; });
-        config.data.labels = categories;
-        config.data.datasets = [first];
-    }
-    return config;
-}
-
-function renderChartV6(data) {
-    var chartId = 'chart_v6_' + Math.random().toString(36).slice(2);
-    var statusId = chartId + '_status';
-    var height = safeNumber(data.height, 420);
-    var html = '<div style="margin:15px 0;padding:15px;background:#f8f9fa;border-radius:8px;border:1px solid #e9ecef;position:relative;">' +
-        '<div id="' + statusId + '" style="position:absolute;inset:15px;display:flex;align-items:center;justify-content:center;color:#777;font-size:13px;">Preparing chart...</div>' +
-        '<canvas id="' + chartId + '" style="width:100%;height:' + height + 'px;display:block;border-radius:4px;"></canvas></div>';
-
-    setTimeout(async function() {
-        var canvas = document.getElementById(chartId);
-        if (!canvas || !canvas.isConnected) return;
-        try {
-            await ensureChartJS();
-            if (!canvas.isConnected) return;
-            var status = document.getElementById(statusId);
-            if (status) status.remove();
-            var chart = new Chart(canvas.getContext('2d'), buildChartConfigV6(data));
-            RendererManager.registerChart(chart);
-        } catch (error) {
-            if (canvas.parentElement) canvas.parentElement.innerHTML = renderGraphicErrorV6('Chart rendering error', error.message);
-        }
-    }, 0);
-    return html;
-}
-
-// ========================================================================
-// BLOCK 1287: Table / Dot Plot / Number Line v2
-// ========================================================================
-
-function renderTableV6(data) {
-    return renderTableType({ type: 'table', title: data.title || '', headers: data.headers || [], rows: data.rows || [] });
-}
-
-function renderDotPlotV6(data) {
-    var values = (data.values || []).map(Number).filter(Number.isFinite);
-    if (!values.length) return renderGraphicErrorV6('Dot plot error', 'values are empty');
-    var counts = {};
-    values.forEach(function(value) { counts[value] = (counts[value] || 0) + 1; });
-    var keys = Object.keys(counts).map(Number).sort(function(a,b){return a-b;});
-    var points = [];
-    keys.forEach(function(value) {
-        for (var i = 1; i <= counts[value]; i++) points.push({ x: value, y: i });
-    });
-    var xb = niceBoundsV6(Math.min.apply(null, keys), Math.max.apply(null, keys), false);
-    var maxCount = Math.max.apply(null, Object.values(counts));
-    return renderEquationGraph({
-        type: 'equation-graph', title: data.title || '', points: points,
-        xAxis: { min: data.xAxis && data.xAxis.min !== undefined ? data.xAxis.min : xb.min, max: data.xAxis && data.xAxis.max !== undefined ? data.xAxis.max : xb.max, tick: data.xAxis && data.xAxis.tick || xb.tick, label: data.xAxis && data.xAxis.label || '' },
-        yAxis: { min: 0, max: maxCount + 1, tick: 1, label: data.yAxis && data.yAxis.label || 'Frequency' },
-        height: data.height || 360,
-        gridColor: data.gridColor || '#eeeeee'
-    });
-}
-
-function renderNumberLineV6(data) {
-    var canvasId = 'number_line_v6_' + Math.random().toString(36).slice(2);
-    var height = safeNumber(data.height, 220);
-    var rawPoints = data.points || (data.values || []).map(function(value) { return { value: value }; });
-    var values = rawPoints.map(function(point) { return Number(point.value !== undefined ? point.value : point.x); }).filter(Number.isFinite);
-    var min = data.min !== undefined ? Number(data.min) : Math.min.apply(null, values.concat([0]));
-    var max = data.max !== undefined ? Number(data.max) : Math.max.apply(null, values.concat([1]));
-    var bounds = niceBoundsV6(min, max, false);
-    min = data.min !== undefined ? min : bounds.min;
-    max = data.max !== undefined ? max : bounds.max;
-    var tick = data.tick || bounds.tick;
-    var html = '<div style="margin:15px 0;padding:15px;background:white;border:1px solid #ddd;border-radius:8px;">' +
-        (data.title ? '<div style="text-align:center;font-weight:700;margin-bottom:8px;">' + escapeHtml(data.title) + '</div>' : '') +
-        '<canvas id="' + canvasId + '" style="width:100%;height:' + height + 'px;display:block;"></canvas></div>';
-    setTimeout(function() {
-        initCanvas(canvasId, 650, height).then(function(result) {
-            if (!result) return;
-            var ctx = result.ctx, w = result.w, h = result.h;
-            var left = 50, right = 30, y = h * 0.58, width = w - left - right;
-            function sx(value) { return left + (value - min) / (max - min) * width; }
-            ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
-            ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(left+width,y); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(left+9,y-6); ctx.lineTo(left+9,y+6); ctx.closePath(); ctx.fillStyle='#222'; ctx.fill();
-            ctx.beginPath(); ctx.moveTo(left+width,y); ctx.lineTo(left+width-9,y-6); ctx.lineTo(left+width-9,y+6); ctx.closePath(); ctx.fill();
-            ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillStyle='#333';
-            for (var value = Math.ceil(min/tick)*tick; value <= max + tick*1e-6; value += tick) {
-                var x = sx(value); ctx.beginPath(); ctx.moveTo(x,y-7); ctx.lineTo(x,y+7); ctx.stroke();
-                ctx.fillText(Number(value.toFixed(10)).toString(),x,y+12);
-            }
-            rawPoints.forEach(function(point) {
-                var value = Number(point.value !== undefined ? point.value : point.x);
-                if (!Number.isFinite(value)) return;
-                var x = sx(value); ctx.beginPath(); ctx.arc(x,y,point.radius||6,0,Math.PI*2);
-                if (point.open) { ctx.fillStyle='#fff'; ctx.fill(); ctx.strokeStyle=point.color||'#111'; ctx.lineWidth=2; ctx.stroke(); }
-                else { ctx.fillStyle=point.color||'#111'; ctx.fill(); }
-                if (point.label) { ctx.fillStyle='#222'; ctx.textBaseline='bottom'; ctx.fillText(point.label,x,y-12); ctx.textBaseline='top'; }
-            });
-        });
-    },0);
-    return html;
-}
-
-// ========================================================================
-// BLOCK 1288: Geometry 2D / 3D / Diagram v2
-// ========================================================================
-
-function collectGeometryPointsV6(data) {
-    var points = {};
-    Object.keys(data.points || {}).forEach(function(name) {
-        var value = data.points[name];
-        points[name] = Array.isArray(value) ? { x:Number(value[0]), y:Number(value[1]) } : { x:Number(value.x), y:Number(value.y) };
-    });
-    return points;
-}
-
-function renderGeometry2DV6(data) {
-    var canvasId = 'geometry2d_v6_' + Math.random().toString(36).slice(2);
-    var height = safeNumber(data.height, 420);
-    var points = collectGeometryPointsV6(data);
-    if (data.shape === 'right-triangle' && Object.keys(points).length === 0) {
-        var legA = Number(data.legA || (data.dimensions && data.dimensions.legA) || 6);
-        var legB = Number(data.legB || (data.dimensions && data.dimensions.legB) || 8);
-        points = { A:{x:0,y:0}, B:{x:legA,y:0}, C:{x:0,y:legB} };
-        data = Object.assign({ polygons:[['A','B','C']], rightAngles:[{vertex:'A',along:['B','C']}], segmentLabels:[{segment:['A','B'],label:String(legA)},{segment:['A','C'],label:String(legB)}] }, data);
-    }
-    var names = Object.keys(points);
-    if (!names.length && !(data.circles || []).length) return renderGraphicErrorV6('Geometry error', 'No points or circles');
-    var xs = names.map(function(name){return points[name].x;});
-    var ys = names.map(function(name){return points[name].y;});
-    (data.circles || []).forEach(function(circle) {
-        var center = typeof circle.center === 'string' ? points[circle.center] : circle.center;
-        if (center) { xs.push(center.x-circle.radius,center.x+circle.radius); ys.push(center.y-circle.radius,center.y+circle.radius); }
-    });
-    var minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs),minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
-    if (!(maxX>minX)){minX-=1;maxX+=1;} if (!(maxY>minY)){minY-=1;maxY+=1;}
-    var padRange=Math.max(maxX-minX,maxY-minY)*0.18;
-    minX-=padRange;maxX+=padRange;minY-=padRange;maxY+=padRange;
-    var html='<div style="margin:15px 0;padding:15px;background:white;border:1px solid #ddd;border-radius:8px;">'+
-        (data.title?'<div style="text-align:center;font-weight:700;margin-bottom:8px;">'+escapeHtml(data.title)+'</div>':'')+
-        '<canvas id="'+canvasId+'" style="width:100%;height:'+height+'px;display:block;"></canvas></div>';
-    setTimeout(function(){initCanvas(canvasId,650,height).then(function(result){if(!result)return;var ctx=result.ctx,w=result.w,h=result.h;
-        ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);var margin=45,unit=Math.min((w-2*margin)/(maxX-minX),(h-2*margin)/(maxY-minY));
-        function screen(p){return{x:margin+(p.x-minX)*unit,y:h-margin-(p.y-minY)*unit};}
-        ctx.lineJoin='round';ctx.lineCap='round';
-        (data.polygons||[]).forEach(function(poly){var verts=poly.vertices||poly;ctx.beginPath();verts.forEach(function(name,i){if(!points[name])return;var p=screen(points[name]);if(i===0)ctx.moveTo(p.x,p.y);else ctx.lineTo(p.x,p.y);});ctx.closePath();ctx.fillStyle=poly.fill||data.fill||'rgba(52,152,219,0.08)';ctx.fill();ctx.strokeStyle=poly.color||data.color||'#222';ctx.lineWidth=poly.lineWidth||2.2;ctx.stroke();});
-        (data.segments||[]).forEach(function(seg){var pair=seg.points||seg;var a=points[pair[0]],b=points[pair[1]];if(!a||!b)return;var sa=screen(a),sb=screen(b);ctx.beginPath();ctx.moveTo(sa.x,sa.y);ctx.lineTo(sb.x,sb.y);ctx.strokeStyle=seg.color||'#222';ctx.lineWidth=seg.lineWidth||2;ctx.setLineDash(seg.dash||[]);ctx.stroke();ctx.setLineDash([]);});
-        (data.circles||[]).forEach(function(circle){var center=typeof circle.center==='string'?points[circle.center]:circle.center;if(!center)return;var c=screen(center);ctx.beginPath();ctx.arc(c.x,c.y,Number(circle.radius)*unit,0,Math.PI*2);ctx.strokeStyle=circle.color||'#222';ctx.lineWidth=circle.lineWidth||2;ctx.stroke();});
-        (data.rightAngles||[]).forEach(function(mark){var vertex=points[mark.vertex];var refs=mark.along||[];if(!vertex||refs.length<2||!points[refs[0]]||!points[refs[1]])return;var v=screen(vertex),p1=screen(points[refs[0]]),p2=screen(points[refs[1]]);var size=12;function unitVec(p){var dx=p.x-v.x,dy=p.y-v.y,len=Math.hypot(dx,dy)||1;return{x:dx/len,y:dy/len};}var u1=unitVec(p1),u2=unitVec(p2);ctx.beginPath();ctx.moveTo(v.x+u1.x*size,v.y+u1.y*size);ctx.lineTo(v.x+(u1.x+u2.x)*size,v.y+(u1.y+u2.y)*size);ctx.lineTo(v.x+u2.x*size,v.y+u2.y*size);ctx.strokeStyle='#222';ctx.lineWidth=1.5;ctx.stroke();});
-        ctx.font='600 13px sans-serif';ctx.fillStyle='#222';ctx.textAlign='center';ctx.textBaseline='middle';
-        names.forEach(function(name){var p=screen(points[name]);ctx.beginPath();ctx.arc(p.x,p.y,3.5,0,Math.PI*2);ctx.fill();if(data.showPointLabels!==false)ctx.fillText(name,p.x+10,p.y-10);});
-        (data.segmentLabels||[]).forEach(function(item){var a=points[item.segment[0]],b=points[item.segment[1]];if(!a||!b)return;var sa=screen(a),sb=screen(b);ctx.fillStyle='#222';ctx.fillText(item.label,(sa.x+sb.x)/2+safeNumber(item.dx,0),(sa.y+sb.y)/2+safeNumber(item.dy,-10));});
-    });},0);return html;
-}
-
-function renderGeometry3DV6(data) {
-    var canvasId='geometry3d_v6_'+Math.random().toString(36).slice(2),height=safeNumber(data.height,400);
-    var html='<div style="margin:15px 0;padding:15px;background:white;border:1px solid #ddd;border-radius:8px;">'+(data.title?'<div style="text-align:center;font-weight:700;margin-bottom:8px;">'+escapeHtml(data.title)+'</div>':'')+'<canvas id="'+canvasId+'" style="width:100%;height:'+height+'px;display:block;"></canvas></div>';
-    setTimeout(function(){initCanvas(canvasId,650,height).then(function(result){if(!result)return;var ctx=result.ctx,w=result.w,h=result.h;ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.strokeStyle=data.color||'#222';ctx.fillStyle=data.fill||'rgba(52,152,219,0.10)';ctx.lineWidth=2;var cx=w/2,cy=h/2;var solid=data.solid||'rectangular-prism';var d=data.dimensions||{};
-        if(solid==='rectangular-prism'||solid==='cube'){var W=180,H=130,D=70;var A={x:cx-W/2,y:cy-H/2+D/2},B={x:cx+W/2,y:cy-H/2+D/2},C={x:cx+W/2,y:cy+H/2+D/2},D1={x:cx-W/2,y:cy+H/2+D/2};var off={x:D,y:-D};var E={x:A.x+off.x,y:A.y+off.y},F={x:B.x+off.x,y:B.y+off.y},G={x:C.x+off.x,y:C.y+off.y},H1={x:D1.x+off.x,y:D1.y+off.y};[[A,B,C,D1],[E,F,G,H1]].forEach(function(poly){ctx.beginPath();poly.forEach(function(p,i){i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);});ctx.closePath();ctx.fill();ctx.stroke();});[[A,E],[B,F],[C,G],[D1,H1]].forEach(function(seg){ctx.beginPath();ctx.moveTo(seg[0].x,seg[0].y);ctx.lineTo(seg[1].x,seg[1].y);ctx.stroke();});ctx.font='13px sans-serif';ctx.fillStyle='#222';ctx.fillText(String(d.width||''),cx,cy+H/2+D/2+22);ctx.fillText(String(d.height||''),cx-W/2-28,cy+10);ctx.fillText(String(d.depth||''),cx+W/2+D/2,cy-H/2-D/2-8);}
-        else if(solid==='cylinder'){var rx=95,ry=30,top=cy-90,bottom=cy+90;ctx.beginPath();ctx.ellipse(cx,top,rx,ry,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(cx-rx,top);ctx.lineTo(cx-rx,bottom);ctx.moveTo(cx+rx,top);ctx.lineTo(cx+rx,bottom);ctx.stroke();ctx.beginPath();ctx.ellipse(cx,bottom,rx,ry,0,0,Math.PI*2);ctx.fill();ctx.stroke();}
-        else if(solid==='cone'){var rx2=105,ry2=30,base=cy+90,apex=cy-110;ctx.beginPath();ctx.moveTo(cx,apex);ctx.lineTo(cx-rx2,base);ctx.moveTo(cx,apex);ctx.lineTo(cx+rx2,base);ctx.stroke();ctx.beginPath();ctx.ellipse(cx,base,rx2,ry2,0,0,Math.PI*2);ctx.fill();ctx.stroke();}
-        else if(solid==='sphere'){var r=105;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.beginPath();ctx.ellipse(cx,cy,r,30,0,0,Math.PI*2);ctx.stroke();}
-        ctx.font='600 13px sans-serif';ctx.fillStyle='#222';if(data.label)ctx.fillText(data.label,20,25);
-    });},0);return html;
-}
-
-function renderDiagramV6(data) {
-    var width=safeNumber(data.width,100),height=safeNumber(data.viewHeight,60);var markerId='arrow_'+Math.random().toString(36).slice(2);
-    var svg='<svg viewBox="0 0 '+width+' '+height+'" role="img" style="width:100%;height:auto;min-height:'+(data.height||280)+'px;background:white;border-radius:6px;">'+
-        '<defs><marker id="'+markerId+'" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0,7 3.5,0 7" fill="#333"/></marker></defs>';
-    var byId={};(data.objects||[]).forEach(function(obj){if(obj.id)byId[obj.id]=obj;});
-    (data.connections||[]).forEach(function(conn){var a=byId[conn.from]||conn.from,b=byId[conn.to]||conn.to;if(!a||!b)return;svg+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="'+(conn.color||'#333')+'" stroke-width="'+(conn.lineWidth||0.7)+'" '+(conn.kind==='arrow'?'marker-end="url(#'+markerId+')"':'')+' />';});
-    (data.objects||[]).forEach(function(obj){var kind=obj.kind||obj.type;if(kind==='box'){svg+='<rect x="'+(obj.x-(obj.w||12)/2)+'" y="'+(obj.y-(obj.h||7)/2)+'" width="'+(obj.w||12)+'" height="'+(obj.h||7)+'" rx="'+(obj.radius||1)+'" fill="'+(obj.fill||'#f7f7f7')+'" stroke="'+(obj.color||'#333')+'"/>';}
-        else if(kind==='circle'){svg+='<circle cx="'+obj.x+'" cy="'+obj.y+'" r="'+(obj.r||4)+'" fill="'+(obj.fill||'#f7f7f7')+'" stroke="'+(obj.color||'#333')+'"/>';}
-        else if(kind==='line'){svg+='<line x1="'+obj.x1+'" y1="'+obj.y1+'" x2="'+obj.x2+'" y2="'+obj.y2+'" stroke="'+(obj.color||'#333')+'" stroke-width="'+(obj.lineWidth||0.7)+'"/>';}
-        if(obj.text||obj.label){svg+='<text x="'+obj.x+'" y="'+(obj.y+(obj.textDy||0.7))+'" text-anchor="middle" dominant-baseline="middle" font-size="'+(obj.fontSize||3.2)+'" fill="'+(obj.textColor||'#222')+'">'+escapeHtml(obj.text||obj.label)+'</text>';}});
-    svg+='</svg>';
-    return '<div style="margin:15px 0;padding:15px;background:white;border:1px solid #ddd;border-radius:8px;">'+(data.title?'<div style="text-align:center;font-weight:700;margin-bottom:8px;">'+escapeHtml(data.title)+'</div>':'')+svg+'</div>';
-}
-
-// ========================================================================
-// BLOCK 1289: Graphic Dispatcher v6 + Legacy Compatibility
-// ========================================================================
-
-function renderResolvedGraphicV6(graphic) {
-    switch (graphic.type) {
-        case 'equation-graph': return renderEquationGraph(applyEquationAutoAxesV6(graphic));
-        case 'chart-v2': return renderChartV6(graphic);
-        case 'table-v2': return renderTableV6(graphic);
-        case 'dot-plot-v2': return renderDotPlotV6(graphic);
-        case 'number-line-v2': return renderNumberLineV6(graphic);
-        case 'geometry-2d': return renderGeometry2DV6(graphic);
-        case 'geometry-3d': return renderGeometry3DV6(graphic);
-        case 'diagram-v2': return renderDiagramV6(graphic);
-        default:
-            return renderGraphicLegacy(graphic);
-    }
-}
-
-function renderGraphicV6(spec) {
-    try {
-        var compiled = compileGraphicV6(spec);
-        if (compiled.validation.warnings.length) {
-            console.warn('SAT Graphic v6 warnings', compiled.id || compiled.template || '', compiled.validation.warnings);
-        }
-        if (!compiled.validation.valid) {
-            console.error('SAT Graphic v6 validation failed', compiled.id || compiled.template || '', compiled.validation.errors, spec);
-            return renderGraphicErrorV6('Graphic validation error', compiled.validation.errors);
-        }
-        return renderResolvedGraphicV6(compiled.graphic);
-    } catch (error) {
-        console.error('SAT Graphic v6 compile error', error, spec);
-        return renderGraphicErrorV6('Graphic compile error', error.message);
-    }
-}
-
-function renderGraphic(jsonData) {
-    var parsed = parseGraphicPayloadV6(jsonData);
-    if (!parsed.ok) {
-        if (parsed.empty) return '';
-        return renderGraphicErrorV6('Invalid JSON', parsed.error);
-    }
-    if (isGraphicV6(parsed.value)) return renderGraphicV6(parsed.value);
-    return renderGraphicLegacy(parsed.value);
-}
-
 
 // ========================================================================
 // BLOCK 1290: renderGraphic 전역 노출
@@ -5111,17 +4390,28 @@ function initialize() {
 window.renderWithEditingMarks = renderWithEditingMarks;
 
 // ========================================================================
+// BLOCK 1590: 콘솔 그래픽 미리보기 도구
+// ========================================================================
+function previewGraphic(graphicData) {
+    var hostId = 'graphic_preview_' + Math.random().toString(36).slice(2, 10);
+    var host = document.createElement('div');
+    host.id = hostId;
+    host.style.cssText = 'max-width:760px;margin:20px auto;padding:12px;background:#fff;border:2px solid #f5a623;border-radius:12px;position:relative;z-index:99999;';
+    document.body.appendChild(host);
+    host.innerHTML = renderGraphic(graphicData);
+    host.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return hostId;
+}
+
+// ========================================================================
 // BLOCK 1600: 내보내기 및 전역 노출 (최종본)
 // ========================================================================
 
 // 1. 전역(window) 노출
 window.renderGraphic = renderGraphic;
 window.renderEquationGraph = renderEquationGraph;
-window.renderGraphicV6 = renderGraphicV6;
-window.compileGraphicV6 = compileGraphicV6;
-window.validateGraphicV6 = validateGraphicV6;
-window.toOneLineGraphicJSON = toOneLineGraphicJSON;
-window.GRAPHIC_V6 = GRAPHIC_V6;
+window.renderGeometry2D = renderGeometry2D;
+window.previewGraphic = previewGraphic;
 window.normalizeEquationExpression = normalizeEquationExpression;
 window.currentQuestions = currentQuestions;    
 window.currentIndex = currentIndex;            
@@ -5181,10 +4471,9 @@ export {
   initialize, 
   startQuizWithNumber, 
   renderGraphic,
-  renderGraphicV6,
-  compileGraphicV6,
-  validateGraphicV6,
-  toOneLineGraphicJSON,
+  renderEquationGraph,
+  renderGeometry2D,
+  previewGraphic,
   renderCurrentQuestion,
   showExplanation,
   goNext,
@@ -5210,10 +4499,8 @@ export {
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
 // ========================================================================
-console.log("✅ SAT Digital Quiz System v6.0.0 Loaded!");
+console.log("✅ SAT Digital Quiz System v6.10.1 Loaded!");
 console.log("📋 원본 B001~B015 완전 복구 + v4.0.0 최적화 병합");
-console.log("✅ Graphic Schema v6.0: one-line JSON + variables + derived values + validation");
-console.log("✅ v6 engines: equation, chart, table, dot plot, number line, 2D/3D geometry, diagram");
 console.log("✅ renderGraphic() 800+ 줄 완전 복구");
 console.log("✅ load50Questions() 원본 복구 + Exponential Backoff + AbortController");
 console.log("✅ renderSubjectiveQuestion() + showExplanation() 복구");
@@ -5222,4 +4509,7 @@ console.log("✅ RendererManager (메모리 누수 방지)");
 console.log("✅ 이벤트 중복 방지 (removeEventListener + onclick)");
 console.log("✅ 백그라운드 순차 CDN 로드 (CPU spike 방지)");
 console.log("🚀 초기 로딩 속도: 0.5~1초 (기존 대비 80% 단축)");
+console.log("✅ Geometry 2D Engine v2.2 (geometry-2d) 통합");
+console.log("✅ ES Module export + window 전역 노출 동시 지원");
+console.log("✅ previewGraphic() 콘솔 미리보기 지원");
 console.log("📊 전체 완성도: 99%");
