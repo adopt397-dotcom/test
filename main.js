@@ -3555,6 +3555,7 @@ window.renderWithEditingMarks = renderWithEditingMarks;
 // ========================================================================
 
 // 1. 전역(window) 노출
+window.renderGraphic = renderGraphic;
 window.initialize = initialize;
 window.startQuizWithNumber = startQuizWithNumber;
 window.renderGraphic = renderGraphic;
