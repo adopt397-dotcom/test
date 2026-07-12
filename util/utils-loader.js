@@ -1,5 +1,5 @@
 // ================================================================
-// utils-loader.js: 모든 유틸리티 통합 (시계, 계산기, 메모장, 단위변환, 스톱워치)
+// utils-loader.js: 모든 유틸리티 통합 (시계+계산기 우선 배치)
 // ================================================================
 (function() {
     'use strict';
@@ -94,6 +94,18 @@
         .util-btn-secondary:hover {
             background: rgba(255, 255, 255, 0.2);
         }
+        .util-btn-green {
+            background: #27ae60;
+        }
+        .util-btn-green:hover {
+            background: #1e8449;
+        }
+        .util-btn-red {
+            background: #e74c3c;
+        }
+        .util-btn-red:hover {
+            background: #c0392b;
+        }
         .util-input {
             width: 100%;
             padding: 8px 12px;
@@ -107,6 +119,11 @@
         .util-input:focus {
             outline: none;
             border-color: #f5a623;
+        }
+        .util-input-small {
+            width: 60px;
+            text-align: center;
+            display: inline-block;
         }
         .util-select {
             padding: 8px 12px;
@@ -201,6 +218,50 @@
             word-break: break-all;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
+        .util-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 4px;
+        }
+        .util-tab {
+            flex: 1;
+            padding: 6px 0;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .util-tab.active {
+            background: rgba(245, 166, 35, 0.2);
+            color: #f5a623;
+        }
+        .util-tab:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .util-lap-list {
+            max-height: 80px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 6px;
+            padding: 4px 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }
+        .util-lap-list div {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .util-lap-list .highlight {
+            color: #f5a623;
+        }
         @media (max-width: 600px) {
             #utilsContainer {
                 top: 10px;
@@ -219,6 +280,9 @@
                 width: 100%;
                 max-width: 360px;
             }
+            .util-display {
+                font-size: 1.6rem;
+            }
         }
     `;
     document.head.appendChild(style);
@@ -230,11 +294,10 @@
     container.id = 'utilsContainer';
     container.innerHTML = `
         <div class="utils-icon-row" id="utilsIconRow">
-            <button class="utils-icon-btn" data-util="clock" title="시계">🕐</button>
+            <button class="utils-icon-btn" data-util="clock" title="타이머/스톱워치">⏱️</button>
             <button class="utils-icon-btn" data-util="calculator" title="계산기">🔢</button>
             <button class="utils-icon-btn" data-util="memo" title="메모장">📝</button>
             <button class="utils-icon-btn" data-util="unit" title="단위 변환기">📐</button>
-            <button class="utils-icon-btn" data-util="stopwatch" title="스톱워치">⏱️</button>
         </div>
         <div class="utils-panel" id="utilsPanel">
             <div class="utils-panel-title" id="utilsPanelTitle">📦 유틸리티</div>
@@ -259,22 +322,236 @@
     // ================================================================
     const utils = {
 
-        // -------- UT-0410: 시계 --------
+        // -------- UT-0410: 통합 타이머 + 스톱워치 (시계 대체) --------
         clock: {
-            name: '🕐 시계',
+            name: '⏱️ 타이머 / 스톱워치',
             load: function() {
-                let seconds = 134 * 60;
+                // -------- 상태 --------
+                let mode = 'timer'; // 'timer' | 'stopwatch'
+                let timerSeconds = parseInt(localStorage.getItem('util_timer_seconds')) || 134 * 60;
+                let swMs = 0;
+                let running = false;
                 let interval = null;
-                panelContent.innerHTML = `<div class="util-display" id="utilClockDisplay">02:14:00</div>`;
-                const display = document.getElementById('utilClockDisplay');
-                const update = () => {
-                    const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-                    const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-                    const s = String(seconds % 60).padStart(2, '0');
-                    display.textContent = h + ':' + m + ':' + s;
+                let lapCount = 0;
+                let lapStartMs = 0;
+                let laps = [];
+
+                // -------- UI 생성 --------
+                panelContent.innerHTML = `
+                    <div class="util-tabs" id="utilTimeTabs">
+                        <button class="util-tab active" data-mode="timer">⏱️ 타이머</button>
+                        <button class="util-tab" data-mode="stopwatch">⏱️ 스톱워치</button>
+                    </div>
+                    <div id="utilTimeContent">
+                        <!-- 타이머 -->
+                        <div id="utilTimerMode">
+                            <div class="util-display" id="utilTimerDisplay">${formatTime(timerSeconds)}</div>
+                            <div class="util-flex" style="justify-content:center;gap:8px;margin-bottom:8px;">
+                                <input class="util-input util-input-small" id="utilTimerMinutes" type="number" min="0" max="99" value="${Math.floor(timerSeconds / 60)}" placeholder="분">
+                                <span style="color:#fff;">분</span>
+                                <input class="util-input util-input-small" id="utilTimerSeconds" type="number" min="0" max="59" value="${timerSeconds % 60}" placeholder="초">
+                                <span style="color:#fff;">초</span>
+                                <button class="util-btn util-btn-secondary" id="utilTimerSet">설정</button>
+                            </div>
+                            <div class="util-flex">
+                                <button class="util-btn util-btn-green" id="utilTimerStart">▶ 시작</button>
+                                <button class="util-btn util-btn-red" id="utilTimerStop">⏹ 정지</button>
+                                <button class="util-btn util-btn-secondary" id="utilTimerReset">↺ 리셋</button>
+                            </div>
+                        </div>
+                        <!-- 스톱워치 -->
+                        <div id="utilStopwatchMode" style="display:none;">
+                            <div class="util-display" id="utilSwDisplay">00:00.0</div>
+                            <div class="util-flex">
+                                <button class="util-btn util-btn-green" id="utilSwStart">▶ 시작</button>
+                                <button class="util-btn util-btn-red" id="utilSwStop">⏹ 정지</button>
+                                <button class="util-btn util-btn-secondary" id="utilSwLap">📌 랩</button>
+                                <button class="util-btn util-btn-secondary" id="utilSwReset">↺ 리셋</button>
+                            </div>
+                            <div class="util-lap-list" id="utilSwLapList"></div>
+                        </div>
+                    </div>
+                `;
+
+                // -------- DOM 요소 --------
+                const timerDisplay = document.getElementById('utilTimerDisplay');
+                const timerMinutes = document.getElementById('utilTimerMinutes');
+                const timerSecondsInput = document.getElementById('utilTimerSeconds');
+                const timerSetBtn = document.getElementById('utilTimerSet');
+                const timerStartBtn = document.getElementById('utilTimerStart');
+                const timerStopBtn = document.getElementById('utilTimerStop');
+                const timerResetBtn = document.getElementById('utilTimerReset');
+                const swDisplay = document.getElementById('utilSwDisplay');
+                const swStartBtn = document.getElementById('utilSwStart');
+                const swStopBtn = document.getElementById('utilSwStop');
+                const swLapBtn = document.getElementById('utilSwLap');
+                const swResetBtn = document.getElementById('utilSwReset');
+                const swLapList = document.getElementById('utilSwLapList');
+                const tabs = document.querySelectorAll('#utilTimeTabs .util-tab');
+                const timerMode = document.getElementById('utilTimerMode');
+                const stopwatchMode = document.getElementById('utilStopwatchMode');
+
+                // -------- 헬퍼 함수 --------
+                function formatTime(sec) {
+                    const h = String(Math.floor(sec / 3600)).padStart(2, '0');
+                    const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+                    const s = String(sec % 60).padStart(2, '0');
+                    return h + ':' + m + ':' + s;
+                }
+
+                function formatSw(ms) {
+                    const m = String(Math.floor(ms / 60000)).padStart(2, '0');
+                    const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
+                    const d = String(Math.floor((ms % 1000) / 100));
+                    return m + ':' + s + '.' + d;
+                }
+
+                function updateTimerDisplay() {
+                    timerDisplay.textContent = formatTime(timerSeconds);
+                }
+
+                function updateSwDisplay() {
+                    swDisplay.textContent = formatSw(swMs);
+                }
+
+                function updateLapList() {
+                    swLapList.innerHTML = laps.map((l, i) =>
+                        `<div><span class="highlight">랩 ${i+1}</span> ${formatSw(l)}</div>`
+                    ).join('');
+                    if (laps.length === 0) {
+                        swLapList.innerHTML = '<div style="color:rgba(255,255,255,0.2);">랩 기록이 없습니다</div>';
+                    }
+                }
+
+                function saveTimerSetting() {
+                    localStorage.setItem('util_timer_seconds', String(timerSeconds));
+                }
+
+                // -------- 타이머 로직 --------
+                function timerStart() {
+                    if (running) return;
+                    if (timerSeconds <= 0) return;
+                    running = true;
+                    interval = setInterval(() => {
+                        if (timerSeconds > 0) {
+                            timerSeconds--;
+                            updateTimerDisplay();
+                            saveTimerSetting();
+                        } else {
+                            clearInterval(interval);
+                            interval = null;
+                            running = false;
+                            alert('⏰ 시간이 다 되었습니다!');
+                        }
+                    }, 1000);
+                }
+
+                function timerStop() {
+                    running = false;
+                    if (interval) { clearInterval(interval); interval = null; }
+                }
+
+                function timerReset() {
+                    timerStop();
+                    timerSeconds = parseInt(timerMinutes.value) * 60 + parseInt(timerSecondsInput.value) || 0;
+                    if (timerSeconds < 0) timerSeconds = 0;
+                    updateTimerDisplay();
+                    saveTimerSetting();
+                }
+
+                function timerSet() {
+                    timerStop();
+                    const mins = parseInt(timerMinutes.value) || 0;
+                    const secs = parseInt(timerSecondsInput.value) || 0;
+                    timerSeconds = mins * 60 + secs;
+                    if (timerSeconds < 0) timerSeconds = 0;
+                    updateTimerDisplay();
+                    saveTimerSetting();
+                }
+
+                // -------- 스톱워치 로직 --------
+                function swStart() {
+                    if (running) return;
+                    running = true;
+                    lapStartMs = swMs;
+                    interval = setInterval(() => {
+                        swMs += 100;
+                        updateSwDisplay();
+                    }, 100);
+                }
+
+                function swStop() {
+                    running = false;
+                    if (interval) { clearInterval(interval); interval = null; }
+                }
+
+                function swLap() {
+                    if (!running) return;
+                    const lapTime = swMs - lapStartMs;
+                    laps.push(lapTime);
+                    lapStartMs = swMs;
+                    updateLapList();
+                }
+
+                function swReset() {
+                    swStop();
+                    swMs = 0;
+                    laps = [];
+                    lapStartMs = 0;
+                    updateSwDisplay();
+                    updateLapList();
+                }
+
+                // -------- 모드 전환 --------
+                function switchMode(mode) {
+                    // 현재 실행 중인 타이머/스톱워치 정지
+                    if (running) {
+                        if (mode === 'timer') swStop();
+                        else timerStop();
+                    }
+                    mode = mode;
+                    if (mode === 'timer') {
+                        timerMode.style.display = 'block';
+                        stopwatchMode.style.display = 'none';
+                        tabs.forEach(t => t.classList.toggle('active', t.dataset.mode === 'timer'));
+                    } else {
+                        timerMode.style.display = 'none';
+                        stopwatchMode.style.display = 'block';
+                        tabs.forEach(t => t.classList.toggle('active', t.dataset.mode === 'stopwatch'));
+                    }
+                }
+
+                // -------- 이벤트 바인딩 --------
+                timerStartBtn.addEventListener('click', timerStart);
+                timerStopBtn.addEventListener('click', timerStop);
+                timerResetBtn.addEventListener('click', timerReset);
+                timerSetBtn.addEventListener('click', timerSet);
+
+                swStartBtn.addEventListener('click', swStart);
+                swStopBtn.addEventListener('click', swStop);
+                swLapBtn.addEventListener('click', swLap);
+                swResetBtn.addEventListener('click', swReset);
+
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        switchMode(tab.dataset.mode);
+                    });
+                });
+
+                // 엔터키로 설정
+                timerMinutes.addEventListener('keydown', (e) => { if (e.key === 'Enter') timerSet(); });
+                timerSecondsInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') timerSet(); });
+
+                // -------- 초기화 --------
+                updateTimerDisplay();
+                updateSwDisplay();
+                updateLapList();
+                switchMode('timer');
+
+                cleanupFn = () => {
+                    if (interval) { clearInterval(interval); interval = null; }
+                    running = false;
                 };
-                interval = setInterval(() => { if (seconds > 0) { seconds--; update(); } else { clearInterval(interval); } }, 1000);
-                cleanupFn = () => { if (interval) clearInterval(interval); };
             }
         },
 
@@ -397,44 +674,6 @@
                 convert();
                 cleanupFn = null;
             }
-        },
-
-        // -------- UT-0450: 스톱워치 --------
-        stopwatch: {
-            name: '⏱️ 스톱워치',
-            load: function() {
-                let ms = 0, running = false, interval = null;
-                panelContent.innerHTML = `
-                    <div class="util-display" id="swDisplay">00:00.0</div>
-                    <div class="util-flex">
-                        <button class="util-btn" id="swStart" style="background:#27ae60;">▶ 시작</button>
-                        <button class="util-btn" id="swStop" style="background:#e74c3c;">⏹ 정지</button>
-                        <button class="util-btn util-btn-secondary" id="swReset">↺ 초기화</button>
-                    </div>
-                `;
-                const display = document.getElementById('swDisplay');
-                const update = () => {
-                    const m = String(Math.floor(ms / 60000)).padStart(2, '0');
-                    const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
-                    const d = String(Math.floor((ms % 1000) / 100));
-                    display.textContent = `${m}:${s}.${d}`;
-                };
-                document.getElementById('swStart').addEventListener('click', () => {
-                    if (running) return;
-                    running = true;
-                    interval = setInterval(() => { ms += 100; update(); }, 100);
-                });
-                document.getElementById('swStop').addEventListener('click', () => {
-                    running = false;
-                    if (interval) { clearInterval(interval); interval = null; }
-                });
-                document.getElementById('swReset').addEventListener('click', () => {
-                    running = false;
-                    if (interval) { clearInterval(interval); interval = null; }
-                    ms = 0; update();
-                });
-                cleanupFn = () => { if (interval) { clearInterval(interval); interval = null; } };
-            }
         }
     };
 
@@ -471,5 +710,5 @@
         });
     });
 
-    console.log('✅ utils-loader.js loaded (all-in-one)');
+    console.log('✅ utils-loader.js loaded (시계+계산기 우선 배치)');
 })();
