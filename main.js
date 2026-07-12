@@ -1,7 +1,7 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 7.0.1
+// 버전: 7.1.0
 // 날짜: 2026-07-12
 // 설명: 표준 다국어 스키마 + 언어 전환 + 기존 그래픽/퀴즈 엔진 통합
 // 표준 열: N, SUBJECT, Q_EN, Q_KO, P_EN, P_KO, 1_EN~4_KO, A, E_EN, E_KO, G, D,
@@ -92,9 +92,10 @@ var API_URL = "https://script.google.com/macros/s/AKfycbwLVA2OJ3H9RAKgzP3NvCWkDC
 var ORIGINAL_API_URL = API_URL;
 var DATA_SHEET = 'sat';
 var CURRENT_SUBJECT = ''; // sat 시트 SUBJECT가 비어 있어 필터하지 않음
-var STORAGE_KEY = 'quiz_progress_main_v7_0_2';
-var TOTAL_CACHE_KEY = 'quiz_total_questions_v7_0_2_sat';
+var STORAGE_KEY = 'quiz_progress_main_v7_1_0';
+var TOTAL_CACHE_KEY = 'quiz_total_questions_v7_1_0_sat';
 var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
+var APP_VERSION = '7.1.0';
 var SUPPORTED_LANGUAGES = ['EN', 'KO'];
 var currentLanguage = (localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'EN').toUpperCase();
 if (SUPPORTED_LANGUAGES.indexOf(currentLanguage) < 0) currentLanguage = 'EN';
@@ -111,6 +112,25 @@ var currentStartNumber = 1;
 var autoSaveInterval = null;
 var chartInstances = {};
 var DOM = {};
+
+// v7.1.0: 구버전에서 잘못 저장된 placeholder/혼합 선택지 데이터를 자동 제거
+(function purgeLegacyQuizCaches() {
+  try {
+    var keep = [STORAGE_KEY, TOTAL_CACHE_KEY, TOTAL_CACHE_KEY + '_time', LANGUAGE_STORAGE_KEY];
+    var remove = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (!k) continue;
+      if ((k.indexOf('quiz_progress_main_v7') === 0 || k.indexOf('quiz_total_questions_v7') === 0) && keep.indexOf(k) < 0) {
+        remove.push(k);
+      }
+    }
+    remove.forEach(function(k) { localStorage.removeItem(k); });
+    if (remove.length) console.log('🧹 Legacy quiz caches removed:', remove);
+  } catch (e) {
+    console.warn('Legacy cache cleanup skipped:', e);
+  }
+})();
 
 // ========================================================================
 // BLOCK 0200: CDN 폴백 체계
@@ -1016,7 +1036,10 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     }
                 };
 
-                if (!localized.question.EN) localized.question.EN = 'Question ' + (uiStartNumber + idx);
+                if (!localized.question.EN) {
+                    console.error('❌ Q_EN missing in API row:', parsed);
+                    throw new Error('Q_EN missing for row ' + (uiStartNumber + idx));
+                }
                 if (!localized.passage.EN) localized.passage.EN = '';
                 if (!localized.explanation.EN) localized.explanation.EN = 'No explanation available.';
 
@@ -1100,6 +1123,8 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 });
 
                 if (idx === 0) {
+                    console.log('🚀 SAT APP VERSION:', APP_VERSION);
+                    console.log('🧾 API raw first row keys:', Object.keys(parsed));
                     console.log('📝 First question mapped:', processed[0]);
                     console.log('📝 Choices:', choices);
                     console.log('🌐 Choice translations:', choiceTranslations);
@@ -3926,7 +3951,7 @@ function renderGraphic(jsonData) {
     var parsedData = parseGraphicPayload(jsonData);
     if (!parsedData) return "";
 
-    var type = String(parsedData.type || '').trim();
+    var type = String(parsedData.type || '').trim().toLowerCase();
     if (!type) return "";
 
     // ★★★ scatter-only를 먼저 처리 (Chart.js 직접 렌더링) ★★★
@@ -4084,10 +4109,15 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
   } else {
     correctAnswerText = 'Answer not available';
   }
+  var graphicHtml = renderGraphic(q.graphic);
+  if (q.graphic) {
+    console.log('🖼️ Graphic render:', { N: q.N, rawType: typeof q.graphic, rawStart: String(q.graphic).slice(0, 80), htmlLength: graphicHtml.length });
+  }
+
   var html = '<div class="question-card">' +
     '<div class="q-num">' + headerText + '</div>' +
     passageHtml +
-    renderGraphic(q.graphic) +
+    graphicHtml +
     '<div class="question-text math-content">' + wrapPowerExpressionsSafely(getQuestionLocalizedText(q, 'question')) + '</div>';
   if (isAnswered) {
     var userAns = String(answered).trim();
@@ -4619,6 +4649,7 @@ async function startQuizWithNumber(uiStartNumber) {
 // BLOCK 1510: 시스템 초기화 (원본 B012 initialize)
 // ========================================================================
 function initialize() {
+  console.log('🚀 SAT main.js v' + APP_VERSION + ' loaded');
   console.log('🔧 initialize() started');
   
   initDOM();
