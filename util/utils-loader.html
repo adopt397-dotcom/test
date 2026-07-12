@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🧰 유틸리티 테스트</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            min-height: 100vh;
+            background: #0a1628;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+            padding: 20px;
+        }
+        .info {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 14px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 20px;
+            border-radius: 8px;
+            max-width: 90%;
+        }
+        .info strong {
+            color: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== 유틸리티 로더 ===== -->
+    <script src="./utils-loader.js"></script>
+
+    <!-- ===== 하단 안내 ===== -->
+    <div class="info">
+        🧰 우측 상단 아이콘 클릭 → 유틸리티 실행 &nbsp;·&nbsp;
+        <strong>🕐 시계</strong> &nbsp;
+        <strong>🔢 계산기</strong> &nbsp;
+        <strong>📝 메모장</strong> &nbsp;
+        <strong>📐 단위 변환기</strong> &nbsp;
+        <strong>⏱️ 스톱워치</strong>
+    </div>
+
+</body>
+</html>
