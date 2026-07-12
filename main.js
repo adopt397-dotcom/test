@@ -88,12 +88,12 @@ var LANG = {
 // ========================================================================
 // BLOCK 0120: 시스템 상수 (원본 B002)
 // ========================================================================
-var API_URL = "https://script.google.com/macros/s/AKfycbzJ_5tnUjWfYSGIMnzglrB-T8nwhLwKVKUs8Kzvxb8Oe8qhX8N9wEi_wf4m6RYcjQA6/exec";
+var API_URL = "https://script.google.com/macros/s/AKfycbwLVA2OJ3H9RAKgzP3NvCWkDCGyRIAhxT6svLU6bvUT-oq1dxrFQSJQ31vb6z7Kyxnk/exec";
 var ORIGINAL_API_URL = API_URL;
 var DATA_SHEET = 'sat';
-var CURRENT_SUBJECT = 'SAT';
-var STORAGE_KEY = 'quiz_progress_main_v7';
-var TOTAL_CACHE_KEY = 'quiz_total_questions_v7_sat';
+var CURRENT_SUBJECT = ''; // sat 시트 SUBJECT가 비어 있어 필터하지 않음
+var STORAGE_KEY = 'quiz_progress_main_v7_0_2';
+var TOTAL_CACHE_KEY = 'quiz_total_questions_v7_0_2_sat';
 var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
 var SUPPORTED_LANGUAGES = ['EN', 'KO'];
 var currentLanguage = (localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'EN').toUpperCase();
@@ -856,7 +856,11 @@ async function detectTotalQuestions() {
     
     try {
         updateSplash(30, 'Checking total questions...');
-        const url = ORIGINAL_API_URL + '?sheet=' + encodeURIComponent(DATA_SHEET) + '&subject=' + encodeURIComponent(CURRENT_SUBJECT) + '&total=true&_=' + Date.now();
+        const totalParams = new URLSearchParams();
+        totalParams.set('total', 'true');
+        totalParams.set('_', String(Date.now()));
+        if (CURRENT_SUBJECT) totalParams.set('subject', CURRENT_SUBJECT);
+        const url = ORIGINAL_API_URL + '?' + totalParams.toString();
         console.log('📡 Requesting total (direct):', url);
         
         const response = await fetch(url, { signal: controller.signal });
@@ -920,7 +924,12 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
     }, 15000);
     
     try {
-        var url = ORIGINAL_API_URL + '?sheet=' + encodeURIComponent(DATA_SHEET) + '&subject=' + encodeURIComponent(CURRENT_SUBJECT) + '&start=' + uiStartNumber + '&limit=' + QUESTIONS_PER_SET;
+        var requestParams = new URLSearchParams();
+        requestParams.set('start', String(uiStartNumber));
+        requestParams.set('limit', String(QUESTIONS_PER_SET));
+        requestParams.set('_', String(Date.now()));
+        if (CURRENT_SUBJECT) requestParams.set('subject', CURRENT_SUBJECT);
+        var url = ORIGINAL_API_URL + '?' + requestParams.toString();
         console.log('📡 Requesting questions (direct):', url);
         
         var response = await fetch(url, { signal: currentAbortController.signal });
@@ -1007,9 +1016,9 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     }
                 };
 
-                if (!localized.question.EN) localized.question.EN = cleanTextValue(parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx));
-                if (!localized.passage.EN) localized.passage.EN = cleanTextValue(parsed.P || parsed.passage || parsed.p || parsed.지문 || '');
-                if (!localized.explanation.EN) localized.explanation.EN = cleanTextValue(parsed.E || parsed.explanation || parsed.e || parsed.해설 || 'No explanation available.');
+                if (!localized.question.EN) localized.question.EN = 'Question ' + (uiStartNumber + idx);
+                if (!localized.passage.EN) localized.passage.EN = '';
+                if (!localized.explanation.EN) localized.explanation.EN = 'No explanation available.';
 
                 var choices = {};
                 var choiceTranslations = {};
@@ -1019,13 +1028,6 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     var key = String(ci);
                     var enChoice = readLocalizedSchemaValue(parsed, normalizedRow, key, 'EN');
                     var koChoice = readLocalizedSchemaValue(parsed, normalizedRow, key, 'KO');
-
-                    if (!enChoice) {
-                        var legacyChoice = readSchemaValue(parsed, normalizedRow, key);
-                        if (legacyChoice !== undefined && legacyChoice !== null && legacyChoice !== '') {
-                            enChoice = cleanTextValue(legacyChoice);
-                        }
-                    }
 
                     if (enChoice !== '') {
                         choices[key] = enChoice;
@@ -1037,29 +1039,9 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     }
                 }
 
-                // 배열/객체 폴백
-                if (!hasAnyChoice && parsed.options && Array.isArray(parsed.options)) {
-                    for (var oi = 0; oi < parsed.options.length && oi < 4; oi++) {
-                        var opt = cleanTextValue(parsed.options[oi]);
-                        if (opt) {
-                            var optKey = String(oi + 1);
-                            choices[optKey] = opt;
-                            choiceTranslations[optKey] = { EN: opt, KO: opt };
-                            hasAnyChoice = true;
-                        }
-                    }
-                }
-                if (!hasAnyChoice && parsed.choices && typeof parsed.choices === 'object') {
-                    Object.keys(parsed.choices).slice(0, 4).forEach(function(choiceKey, choiceIndex) {
-                        var val = cleanTextValue(parsed.choices[choiceKey]);
-                        if (val) {
-                            var normalizedKey = String(choiceIndex + 1);
-                            choices[normalizedKey] = val;
-                            choiceTranslations[normalizedKey] = { EN: val, KO: val };
-                            hasAnyChoice = true;
-                        }
-                    });
-                }
+                // 새 표준 스키마 전용:
+                // parsed.options / parsed.choices 구포맷 폴백을 사용하지 않는다.
+                // 이 폴백이 남아 있으면 영어·한국어가 서로 다른 선택지로 섞일 수 있다.
 
                 if (!hasAnyChoice) {
                     choices = {};
@@ -1067,11 +1049,19 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     console.log('📝 주관식 문제 감지 - 정답:', parsed.A || parsed.answer || '');
                 }
 
+                if (hasAnyChoice && Object.keys(choices).length !== 4) {
+                    console.warn('⚠️ 선택지 4개 미완성:', {
+                        N: readSchemaValue(parsed, normalizedRow, 'N'),
+                        found: Object.keys(choices),
+                        row: parsed
+                    });
+                }
+
                 var finalAnswer = '1';
                 var schemaAnswer = readSchemaValue(parsed, normalizedRow, 'A');
-                if (schemaAnswer !== undefined && schemaAnswer !== null && schemaAnswer !== '') finalAnswer = String(schemaAnswer).trim();
-                else if (parsed.answer !== undefined && parsed.answer !== null && parsed.answer !== '') finalAnswer = String(parsed.answer).trim();
-                else if (parsed.정답 !== undefined && parsed.정답 !== null && parsed.정답 !== '') finalAnswer = String(parsed.정답).trim();
+                if (schemaAnswer !== undefined && schemaAnswer !== null && schemaAnswer !== '') {
+                    finalAnswer = String(schemaAnswer).trim();
+                }
 
                 var letterToNum = { A: '1', B: '2', C: '3', D: '4' };
                 if (letterToNum[finalAnswer.toUpperCase()]) finalAnswer = letterToNum[finalAnswer.toUpperCase()];
@@ -1097,7 +1087,7 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     answer: finalAnswer,
                     explanation: localized.explanation.EN,
                     localized: localized,
-                    graphic: graphicValue || parsed.graphic || parsed.g || parsed.그래픽 || '',
+                    graphic: graphicValue,
                     originalNumber: originalNumber,
                     A: schemaAnswer !== undefined && schemaAnswer !== null && schemaAnswer !== '' ? schemaAnswer : finalAnswer,
                     difficulty: readSchemaValue(parsed, normalizedRow, 'D') || '',
@@ -4849,7 +4839,7 @@ export {
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
 // ========================================================================
-console.log("✅ SAT Digital Quiz System v7.0.1 Multilingual Loaded!");
+console.log("✅ SAT Digital Quiz System v7.0.2 Multilingual Loaded!");
 console.log("✅ Chart Engine v6.2: line series.data/categories + axis min/max/tick/suffix 지원");
 console.log("📋 원본 B001~B015 완전 복구 + v4.0.0 최적화 병합");
 console.log("✅ renderGraphic() 800+ 줄 완전 복구");
