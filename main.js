@@ -1,9 +1,11 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 6.10.4
-// 날짜: 2026-07-11
-// 설명: 운영 main.js 기반 + Equation Engine + Geometry 2D Engine + ES Module 통합
+// 버전: 7.0.0
+// 날짜: 2026-07-12
+// 설명: 표준 다국어 스키마 + 언어 전환 + 기존 그래픽/퀴즈 엔진 통합
+// 표준 열: N, SUBJECT, Q_EN, Q_KO, P_EN, P_KO, 1_EN~4_KO, A, E_EN, E_KO, G, D,
+//          SOURCE_TYPE, VARIANT_NO, SOURCE_ID, STATUS, CREATED_AT, UPDATED_AT
 // ========================================================================
 
 // ========================================================================
@@ -88,8 +90,14 @@ var LANG = {
 // ========================================================================
 var API_URL = "https://script.google.com/macros/s/AKfycbzJ_5tnUjWfYSGIMnzglrB-T8nwhLwKVKUs8Kzvxb8Oe8qhX8N9wEi_wf4m6RYcjQA6/exec";
 var ORIGINAL_API_URL = API_URL;
-var STORAGE_KEY = 'quiz_progress_main';
-var TOTAL_CACHE_KEY = 'quiz_total_questions';
+var DATA_SHEET = 'sat';
+var CURRENT_SUBJECT = 'SAT';
+var STORAGE_KEY = 'quiz_progress_main_v7';
+var TOTAL_CACHE_KEY = 'quiz_total_questions_v7_sat';
+var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
+var SUPPORTED_LANGUAGES = ['EN', 'KO'];
+var currentLanguage = (localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'EN').toUpperCase();
+if (SUPPORTED_LANGUAGES.indexOf(currentLanguage) < 0) currentLanguage = 'EN';
 var QUESTIONS_PER_SET = 120;
 var TOTAL_QUESTIONS = 0;
 var masterQuestions = [];
@@ -453,6 +461,7 @@ DOM.progressCancelBtn = null;
 DOM.timerDisplay = null;
 DOM.timerPauseBtn = null;
 DOM.timerResetBtn = null;
+DOM.languageSelector = null;
 
 function initDOM() {
     DOM.splashOverlay = document.getElementById('splashOverlay');
@@ -501,6 +510,7 @@ function initDOM() {
     DOM.timerDisplay = document.getElementById('timerDisplay');
     DOM.timerPauseBtn = document.getElementById('timerPauseBtn');
     DOM.timerResetBtn = document.getElementById('timerResetBtn');
+    DOM.languageSelector = document.getElementById('languageSelector');
     LOG.debug('✅ DOM initialized');
 }
 
@@ -632,6 +642,7 @@ function saveProgress() {
       originalQuestions: originalQuestions,
       masterQuestions: masterQuestions,
       timestamp: new Date().toISOString(),
+      currentLanguage: currentLanguage,
       cdnLoaded: {
         chartjs: LOADER.chartjs.loaded,
         threejs: LOADER.threejs.loaded,
@@ -657,6 +668,7 @@ function loadProgress() {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     var data = JSON.parse(raw);
+    if (data.currentLanguage) setLanguage(data.currentLanguage, false);
     if (data.cdnLoaded) {
         if (data.cdnLoaded.chartjs && typeof Chart === 'undefined') data.cdnLoaded.chartjs = false;
         if (data.cdnLoaded.mathjax && typeof MathJax === 'undefined') data.cdnLoaded.mathjax = false;
@@ -682,6 +694,66 @@ function startAutoSave() {
   autoSaveInterval = setInterval(function() {
     saveProgress();
   }, 5000);
+}
+
+// ========================================================================
+// BLOCK 0650: 다국어 엔진 (그래픽 G는 언어와 무관하게 영어 원본 유지)
+// ========================================================================
+function cleanTextValue(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\n/g, '<br>').trim();
+}
+
+function getLocalizedRaw(parsed, baseKey, language) {
+  var lang = String(language || currentLanguage || 'EN').toUpperCase();
+  var localizedKey = baseKey + '_' + lang;
+  var englishKey = baseKey + '_EN';
+  var value = parsed && parsed[localizedKey];
+  if (value === undefined || value === null || value === '') value = parsed && parsed[englishKey];
+  return cleanTextValue(value);
+}
+
+function getQuestionLocalizedText(q, field) {
+  if (!q) return '';
+  var lang = currentLanguage;
+  var map = q.localized || {};
+  var fieldMap = map[field] || {};
+  var value = fieldMap[lang];
+  if (value === undefined || value === null || value === '') value = fieldMap.EN;
+  if (value === undefined || value === null || value === '') value = q[field] || '';
+  return cleanTextValue(value);
+}
+
+function getChoiceLocalizedText(q, key) {
+  if (!q) return '';
+  var translations = q.choiceTranslations || {};
+  var choiceMap = translations[String(key)] || {};
+  var value = choiceMap[currentLanguage];
+  if (value === undefined || value === null || value === '') value = choiceMap.EN;
+  if (value === undefined || value === null || value === '') value = q.choices && q.choices[String(key)];
+  return cleanTextValue(value);
+}
+
+function setLanguage(language, rerender) {
+  var next = String(language || 'EN').toUpperCase();
+  if (SUPPORTED_LANGUAGES.indexOf(next) < 0) next = 'EN';
+  currentLanguage = next;
+  localStorage.setItem(LANGUAGE_STORAGE_KEY, currentLanguage);
+  if (DOM.languageSelector) DOM.languageSelector.value = currentLanguage;
+  document.documentElement.lang = currentLanguage === 'KO' ? 'ko' : 'en';
+  LOG.info('🌐 Language changed:', currentLanguage);
+  if (rerender !== false && currentQuestions.length && DOM.questionContainer) {
+    renderCurrentQuestion();
+  }
+  return currentLanguage;
+}
+
+function initLanguageSelector() {
+  if (!DOM.languageSelector) return;
+  DOM.languageSelector.value = currentLanguage;
+  DOM.languageSelector.onchange = function() {
+    setLanguage(this.value, true);
+  };
 }
 
 // ========================================================================
@@ -748,7 +820,7 @@ async function detectTotalQuestions() {
     
     try {
         updateSplash(30, 'Checking total questions...');
-        const url = ORIGINAL_API_URL + '?total=true&_=' + Date.now();
+        const url = ORIGINAL_API_URL + '?sheet=' + encodeURIComponent(DATA_SHEET) + '&subject=' + encodeURIComponent(CURRENT_SUBJECT) + '&total=true&_=' + Date.now();
         console.log('📡 Requesting total (direct):', url);
         
         const response = await fetch(url, { signal: controller.signal });
@@ -773,7 +845,7 @@ async function detectTotalQuestions() {
             return total;
         }
         
-        console.warn('⚠️ Could not detect total, using fallback: 1320');
+        console.warn('⚠️ Could not detect total, using fallback: 1440');
     } catch(e) {
         clearTimeout(timeoutId);
         if (e.name === 'AbortError') {
@@ -785,7 +857,7 @@ async function detectTotalQuestions() {
         }
     }
     
-    TOTAL_QUESTIONS = 1320;
+    TOTAL_QUESTIONS = 1440;
     localStorage.setItem(TOTAL_CACHE_KEY, String(TOTAL_QUESTIONS));
     localStorage.setItem(TOTAL_CACHE_KEY + '_time', String(now));
     updateSplash(60, 'Preparing data...');
@@ -812,7 +884,7 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
     }, 15000);
     
     try {
-        var url = ORIGINAL_API_URL + '?start=' + uiStartNumber + '&limit=' + QUESTIONS_PER_SET;
+        var url = ORIGINAL_API_URL + '?sheet=' + encodeURIComponent(DATA_SHEET) + '&subject=' + encodeURIComponent(CURRENT_SUBJECT) + '&start=' + uiStartNumber + '&limit=' + QUESTIONS_PER_SET;
         console.log('📡 Requesting questions (direct):', url);
         
         var response = await fetch(url, { signal: currentAbortController.signal });
@@ -880,132 +952,112 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 }
                 
                 // ============================================================
-                // ★★★ 1. 문제 텍스트 처리 (줄바꿈 보존) ★★★
+                // ★★★ 표준 다국어 스키마 매핑 ★★★
                 // ============================================================
-                var questionText = parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx);
-                if (typeof questionText === 'string') {
-                    questionText = questionText.replace(/\n/g, '<br>');
-                }
-                
-                var passageText = parsed.passage || parsed.P || parsed.p || parsed.지문 || '';
-                if (typeof passageText === 'string') {
-                    passageText = passageText.replace(/\n/g, '<br>');
-                }
-                
-                // ============================================================
-                // ★★★ 2. 선택지 강화 파싱 ★★★
-                // ============================================================
+                var localized = {
+                    question: {
+                        EN: getLocalizedRaw(parsed, 'Q', 'EN'),
+                        KO: getLocalizedRaw(parsed, 'Q', 'KO')
+                    },
+                    passage: {
+                        EN: getLocalizedRaw(parsed, 'P', 'EN'),
+                        KO: getLocalizedRaw(parsed, 'P', 'KO')
+                    },
+                    explanation: {
+                        EN: getLocalizedRaw(parsed, 'E', 'EN'),
+                        KO: getLocalizedRaw(parsed, 'E', 'KO')
+                    }
+                };
+
+                // 구 포맷은 테스트/안전용 폴백만 유지
+                if (!localized.question.EN) localized.question.EN = cleanTextValue(parsed.Q || parsed.question || parsed.q || parsed.문제 || parsed.text || 'Question ' + (uiStartNumber + idx));
+                if (!localized.passage.EN) localized.passage.EN = cleanTextValue(parsed.P || parsed.passage || parsed.p || parsed.지문 || '');
+                if (!localized.explanation.EN) localized.explanation.EN = cleanTextValue(parsed.E || parsed.explanation || parsed.e || parsed.해설 || 'No explanation available.');
+
                 var choices = {};
+                var choiceTranslations = {};
                 var hasAnyChoice = false;
-                
-                // 2-1. 직접 숫자 키 확인 (parsed['1'], parsed['2'] 등)
+
                 for (var ci = 1; ci <= 4; ci++) {
                     var key = String(ci);
-                    var val = parsed[key];
-                    if (val !== undefined && val !== null && val !== '') {
-                        choices[key] = String(val);
+                    var enChoice = getLocalizedRaw(parsed, key, 'EN');
+                    var koChoice = getLocalizedRaw(parsed, key, 'KO');
+                    if (!enChoice && parsed[key] !== undefined && parsed[key] !== null) enChoice = cleanTextValue(parsed[key]);
+                    if (enChoice !== '') {
+                        choices[key] = enChoice;
+                        choiceTranslations[key] = { EN: enChoice, KO: koChoice || enChoice };
                         hasAnyChoice = true;
                     }
                 }
-                
-                // 2-2. options 배열 확인
+
+                // 배열/객체 폴백
                 if (!hasAnyChoice && parsed.options && Array.isArray(parsed.options)) {
                     for (var oi = 0; oi < parsed.options.length && oi < 4; oi++) {
-                        var opt = parsed.options[oi];
-                        if (opt !== undefined && opt !== null && opt !== '') {
-                            choices[String(oi + 1)] = String(opt);
+                        var opt = cleanTextValue(parsed.options[oi]);
+                        if (opt) {
+                            var optKey = String(oi + 1);
+                            choices[optKey] = opt;
+                            choiceTranslations[optKey] = { EN: opt, KO: opt };
                             hasAnyChoice = true;
                         }
                     }
                 }
-                
-                // 2-3. choices 객체 확인
                 if (!hasAnyChoice && parsed.choices && typeof parsed.choices === 'object') {
-                    var choiceKeys = Object.keys(parsed.choices);
-                    for (var ck = 0; ck < choiceKeys.length; ck++) {
-                        var key = choiceKeys[ck];
-                        var val = parsed.choices[key];
-                        if (val !== undefined && val !== null && val !== '') {
-                            choices[key] = String(val);
+                    Object.keys(parsed.choices).slice(0, 4).forEach(function(choiceKey, choiceIndex) {
+                        var val = cleanTextValue(parsed.choices[choiceKey]);
+                        if (val) {
+                            var normalizedKey = String(choiceIndex + 1);
+                            choices[normalizedKey] = val;
+                            choiceTranslations[normalizedKey] = { EN: val, KO: val };
                             hasAnyChoice = true;
                         }
-                    }
+                    });
                 }
-                
-                // 2-4. A, B, C, D 키 확인 (대문자)
+
                 if (!hasAnyChoice) {
-                    var letterKeys = ['A', 'B', 'C', 'D'];
-                    for (var lk = 0; lk < letterKeys.length; lk++) {
-                        var key = letterKeys[lk];
-                        var val = parsed[key];
-                        if (val !== undefined && val !== null && val !== '') {
-                            choices[String(lk + 1)] = String(val);
-                            hasAnyChoice = true;
-                        }
-                    }
-                }
-                
-                // ============================================================
-                // ★★★ 2-5. 선택지가 없으면 주관식으로 처리 ★★★
-                // ============================================================
-                if (!hasAnyChoice) {
-                    // ★★★ 선택지를 생성하지 않고 주관식 유지 ★★★
-                    // 빈 choices 객체 유지 → isSubjectiveQuestion()에서 true 반환
                     choices = {};
-                    hasAnyChoice = false;
-                    
-                    var answerVal = parsed.A || parsed.answer || parsed.정답 || '';
-                    console.log('📝 주관식 문제 감지 (선택지 없음) - 정답:', answerVal);
-                    // 참고: 정답은 parsed.A 또는 parsed.answer에 이미 저장됨
+                    choiceTranslations = {};
+                    console.log('📝 주관식 문제 감지 - 정답:', parsed.A || parsed.answer || '');
                 }
-                
-                // ============================================================
-                // ★★★ 3. 정답 파싱 ★★★
-                // ============================================================
+
                 var finalAnswer = '1';
-                if (parsed.A !== undefined && parsed.A !== null && parsed.A !== "") {
-                    finalAnswer = String(parsed.A).trim();
-                } else if (parsed.answer !== undefined && parsed.answer !== null && parsed.answer !== "") {
-                    finalAnswer = String(parsed.answer).trim();
-                } else if (parsed.정답 !== undefined && parsed.정답 !== null && parsed.정답 !== "") {
-                    finalAnswer = String(parsed.정답).trim();
-                } else if (parsed.a !== undefined && parsed.a !== null && parsed.a !== "") {
-                    finalAnswer = String(parsed.a).trim();
+                if (parsed.A !== undefined && parsed.A !== null && parsed.A !== '') finalAnswer = String(parsed.A).trim();
+                else if (parsed.answer !== undefined && parsed.answer !== null && parsed.answer !== '') finalAnswer = String(parsed.answer).trim();
+                else if (parsed.정답 !== undefined && parsed.정답 !== null && parsed.정답 !== '') finalAnswer = String(parsed.정답).trim();
+
+                var letterToNum = { A: '1', B: '2', C: '3', D: '4' };
+                if (letterToNum[finalAnswer.toUpperCase()]) finalAnswer = letterToNum[finalAnswer.toUpperCase()];
+
+                if (hasAnyChoice && !choices[finalAnswer]) {
+                    finalAnswer = Object.keys(choices)[0] || '1';
+                    console.warn('⚠️ 정답 위치 보정:', finalAnswer);
                 }
-                
-                // 정답이 알파벳(A, B, C, D)이면 숫자로 변환
-                var letterToNum = { 'A': '1', 'B': '2', 'C': '3', 'D': '4' };
-                if (letterToNum[finalAnswer.toUpperCase()]) {
-                    finalAnswer = letterToNum[finalAnswer.toUpperCase()];
-                }
-                
-                // 정답이 choices에 없으면 첫 번째 선택지로 설정 (객관식인 경우만)
-                if (hasAnyChoice && Object.keys(choices).length > 0) {
-                    if (!choices[finalAnswer] || choices[finalAnswer] === '' || choices[finalAnswer] === 'No options') {
-                        var firstKey = Object.keys(choices).filter(function(k) { 
-                            return choices[k] && choices[k] !== '' && choices[k] !== 'No options'; 
-                        })[0] || '1';
-                        finalAnswer = firstKey;
-                        console.warn('⚠️ 정답이 선택지에 없음 → 첫 번째 선택지로 설정: ' + firstKey);
-                    }
-                }
-                
+
                 var originalNumber = parsed.N || parsed.originalNumber || parsed.n || (uiStartNumber + idx);
                 var isLatex = parsed.latex || parsed.math || parsed.isMath || false;
-                
+
                 processed.push({
                     N: originalNumber,
-                    question: questionText,
-                    passage: passageText,
+                    subject: parsed.SUBJECT || CURRENT_SUBJECT,
+                    question: localized.question.EN,
+                    passage: localized.passage.EN,
                     choices: choices,
+                    choiceTranslations: choiceTranslations,
                     answer: finalAnswer,
-                    explanation: parsed.explanation || parsed.E || parsed.e || parsed.해설 || 'No explanation available.',
-                    graphic: parsed.graphic || parsed.G || parsed.g || parsed.그래픽 || parsed.P_graph || '',
+                    explanation: localized.explanation.EN,
+                    localized: localized,
+                    graphic: parsed.G || parsed.graphic || parsed.g || parsed.그래픽 || '',
                     originalNumber: originalNumber,
-                    A: parsed.A || parsed.answer || parsed.정답 || '',
-                    latex: isLatex
+                    A: parsed.A !== undefined ? parsed.A : finalAnswer,
+                    difficulty: parsed.D || '',
+                    sourceType: parsed.SOURCE_TYPE || '',
+                    variantNo: parsed.VARIANT_NO || 0,
+                    sourceId: parsed.SOURCE_ID || '',
+                    status: parsed.STATUS || '',
+                    latex: isLatex,
+                    raw: parsed
                 });
-                
+
                 if (idx === 0) {
                     console.log('📝 First question mapped:', processed[0]);
                     console.log('📝 Choices:', choices);
@@ -1175,34 +1227,36 @@ function isSubjectiveQuestion(q) {
 // BLOCK 0860: randomizeChoicesOnly
 // ========================================================================
 function randomizeChoicesOnly(q) {
-    if (!q || !q.choices) return q;
-    if (!hasRealChoices(q)) return q;
+    if (!q || !q.choices || !hasRealChoices(q)) return q;
     try {
         var validEntries = Object.entries(q.choices).filter(function(item) {
-            var k = item[0], v = item[1];
-            if (typeof v === 'string') return v && v.trim() !== "";
-            return v !== null && v !== undefined && v !== "";
+            return item[1] !== null && item[1] !== undefined && String(item[1]).trim() !== '';
         }).map(function(item) {
-            var k = item[0], v = item[1];
-            return { k: parseInt(k), v: String(v) };
+            return {
+                k: String(item[0]),
+                v: String(item[1]),
+                translations: (q.choiceTranslations && q.choiceTranslations[String(item[0])]) || { EN: String(item[1]), KO: String(item[1]) }
+            };
         });
-        if (validEntries.length === 0) return q;
+        if (!validEntries.length) return q;
         var shuffled = validEntries.slice();
         for (var i = shuffled.length - 1; i > 0; i--) {
             var j = Math.floor(Math.random() * (i + 1));
-            var temp = shuffled[i];
-            shuffled[i] = shuffled[j];
-            shuffled[j] = temp;
+            var temp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = temp;
         }
         var newChoices = {};
-        shuffled.forEach(function(c, idx) { newChoices[idx + 1] = c.v; });
-        var originalAns = parseInt(q.answer);
-        var correctIdx = shuffled.findIndex(function(c) { return c.k == originalAns; });
-        var newAnswer = (correctIdx + 1).toString();
-        if (isNaN(correctIdx) || correctIdx < 0) return q;
-        return { ...q, choices: newChoices, answer: newAnswer };
+        var newTranslations = {};
+        shuffled.forEach(function(c, idx) {
+            var newKey = String(idx + 1);
+            newChoices[newKey] = c.v;
+            newTranslations[newKey] = c.translations;
+        });
+        var originalAns = String(q.answer);
+        var correctIdx = shuffled.findIndex(function(c) { return c.k === originalAns; });
+        if (correctIdx < 0) return q;
+        return { ...q, choices: newChoices, choiceTranslations: newTranslations, answer: String(correctIdx + 1) };
     } catch(e) {
-        console.error("Randomize error:", e);
+        console.error('Randomize error:', e);
         return q;
     }
 }
@@ -3952,7 +4006,7 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
     '<div class="q-num">' + headerText + '</div>' +
     passageHtml +
     renderGraphic(q.graphic) +
-    '<div class="question-text math-content">' + wrapPowerExpressionsSafely(q.question) + '</div>';
+    '<div class="question-text math-content">' + wrapPowerExpressionsSafely(getQuestionLocalizedText(q, 'question')) + '</div>';
   if (isAnswered) {
     var userAns = String(answered).trim();
     var isCorrect = (userAns === correctAnswerText) || (parseFloat(userAns) === parseFloat(correctAnswerText));
@@ -3965,7 +4019,7 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
       '</div>' +
       '<div class="subjective-explanation">' +
       '<strong>Explanation</strong>' +
-      '<p style="margin-top:8px;" class="math-content">' + escapeHtml(q.explanation || 'No explanation available.') + '</p>' +
+      '<p style="margin-top:8px;" class="math-content">' + escapeHtml(getQuestionLocalizedText(q, 'explanation') || 'No explanation available.') + '</p>' +
       '</div>';
   } else {
     html += '<div class="subjective-input-group">' +
@@ -4023,7 +4077,7 @@ function showExplanation() {
     var userAns = String(ans).trim();
     var isCorrect = (userAns === correctAns) || (parseFloat(userAns) === parseFloat(correctAns));
     var statusColor = isCorrect ? '#27ae60' : '#e74c3c';
-    var explanationText = q.explanation || LANG.noExplanation;
+    var explanationText = getQuestionLocalizedText(q, 'explanation') || LANG.noExplanation;
     DOM.explanationText.innerHTML =
       '<div style="background:' + statusColor + ';color:white;padding:8px 16px;border-radius:6px;display:inline-block;font-weight:700;margin-bottom:15px;">' +
       'Answer: ' + escapeHtml(correctAns) +
@@ -4054,7 +4108,7 @@ function showExplanation() {
   var correctAnswerLetter = getAnswerLetter(displayAnswerIndex);
   var isCorrect = (ans === displayAnswerIndex);
   var statusColor = isCorrect ? '#27ae60' : '#e74c3c';
-  var explanationText = q.explanation || LANG.noExplanation;
+  var explanationText = getQuestionLocalizedText(q, 'explanation') || LANG.noExplanation;
   DOM.explanationText.innerHTML =
     '<div style="background:' + statusColor + ';color:white;padding:8px 16px;border-radius:6px;display:inline-block;font-weight:700;margin-bottom:15px;">' +
     'Answer: ' + correctAnswerLetter +
@@ -4110,7 +4164,7 @@ function renderCurrentQuestion() {
   var isMath = detectMathQuestion(q);
   
   var passageHtml = '';
-  var displayPassage = q.passage || '';
+  var displayPassage = getQuestionLocalizedText(q, 'passage');
   if (displayPassage && displayPassage.trim() !== '' && displayPassage.trim() !== 'No passage.') {
     passageHtml = '<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:10px 0;border:1px solid #dee2e6;">' +
       '<div style="white-space:pre-wrap;font-size:15px;line-height:1.7;">' +
@@ -4119,7 +4173,7 @@ function renderCurrentQuestion() {
   }
   
   // ★★★ 혼합 문장 안전 처리: 완전한 지수식만 MathJax로 감싸기 ★★★
-  var questionText = q.question || 'No question text';
+  var questionText = getQuestionLocalizedText(q, 'question') || 'No question text';
   var questionDisplay = wrapPowerExpressionsSafely(questionText);
 
   if (isSubjective) {
@@ -4151,7 +4205,7 @@ function renderCurrentQuestion() {
     var key = validKeys[idx];
     var choiceNum = parseInt(key);
     var letter = getAnswerLetter(idx + 1);
-    var choiceText = q.choices[key] || '';
+    var choiceText = getChoiceLocalizedText(q, key);
     if (!choiceText) continue;
     var isSelected = (answered === choiceNum);
     var isCorrectChoice = (choiceNum === displayAnswer);
@@ -4486,6 +4540,7 @@ function initialize() {
   console.log('🔧 initialize() started');
   
   initDOM();
+  initLanguageSelector();
   initTimer();
   attachEvents();
 
@@ -4638,6 +4693,9 @@ window.loadAllLibrariesInBackground = loadAllLibrariesInBackground;
 window.showToast = showToast;
 window.LOG = LOG;
 window.LANG = LANG;
+window.setLanguage = setLanguage;
+window.getCurrentLanguage = function() { return currentLanguage; };
+window.SUPPORTED_LANGUAGES = SUPPORTED_LANGUAGES;
 window.DOM = DOM;
 window.LOADER = LOADER;
 window.RendererManager = RendererManager;
@@ -4691,6 +4749,7 @@ export {
   ensureMathJS,
   loadAllLibrariesInBackground,
   showToast,
+  setLanguage,
   LOG,
   RendererManager
 };
@@ -4698,11 +4757,11 @@ export {
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
 // ========================================================================
-console.log("✅ SAT Digital Quiz System v6.10.3 Loaded!");
+console.log("✅ SAT Digital Quiz System v7.0.0 Multilingual Loaded!");
 console.log("✅ Chart Engine v6.2: line series.data/categories + axis min/max/tick/suffix 지원");
 console.log("📋 원본 B001~B015 완전 복구 + v4.0.0 최적화 병합");
 console.log("✅ renderGraphic() 800+ 줄 완전 복구");
-console.log("✅ load50Questions() 원본 복구 + Exponential Backoff + AbortController");
+console.log("✅ 표준 다국어 스키마 + 언어 전환 + Exponential Backoff + AbortController");
 console.log("✅ renderSubjectiveQuestion() + showExplanation() 복구");
 console.log("✅ Render Token (Race Condition 방지)");
 console.log("✅ RendererManager (메모리 누수 방지)");
@@ -4712,4 +4771,5 @@ console.log("🚀 초기 로딩 속도: 0.5~1초 (기존 대비 80% 단축)");
 console.log("✅ Geometry 2D Engine v2.2 (geometry-2d) 통합");
 console.log("✅ ES Module export + window 전역 노출 동시 지원");
 console.log("✅ previewGraphic() 콘솔 미리보기 지원");
-console.log("📊 전체 완성도: 99%");
+console.log("🌐 EN/KO 전환 지원 · G 그래픽은 영어 원본 고정");
+console.log("📊 전체 완성도: V7 테스트 빌드");
