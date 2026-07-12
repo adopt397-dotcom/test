@@ -4,7 +4,7 @@
 // ================================================================
 
 const API_URL =
-  '여기에_구글_APPS_SCRIPT_웹앱_URL을_넣으세요';
+  'https://script.google.com/macros/s/AKfycbzJ_5tnUjWfYSGIMnzglrB-T8nwhLwKVKUs8Kzvxb8Oe8qhX8N9wEi_wf4m6RYcjQA6/exec';
 
 const DEFAULT_SHEET = 'generated_set_001';
 const DEFAULT_LIMIT = 120;
