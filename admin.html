@@ -1120,13 +1120,30 @@
 <!-- 1. MathJax -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
 
-<!-- 2. GitHub main.js 불러오기 + 초기화 -->
+<!-- 2. GitHub main.js 불러오기 + 초기화 (강제 최신 버전) -->
 <script type="module">
-import { initialize } from './main.js?v=7.0.2';
+const APP_VERSION = '7.1.0';
+const moduleUrl = './main.js?v=' + APP_VERSION + '&t=' + Date.now();
+console.log('📦 Loading SAT module:', moduleUrl);
 
-document.addEventListener('DOMContentLoaded', () => {
-  initialize();
-});
+try {
+  const mod = await import(moduleUrl);
+  window.__SAT_APP_VERSION__ = APP_VERSION;
+  window.__SAT_MODULE_URL__ = moduleUrl;
+  console.log('✅ SAT module loaded:', APP_VERSION);
+
+  const start = () => mod.initialize();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+  } else {
+    start();
+  }
+} catch (error) {
+  console.error('❌ SAT module load failed:', error);
+  document.body.insertAdjacentHTML('afterbegin',
+    '<div style="padding:16px;background:#fee;color:#b00020;font-weight:700;text-align:center">main.js v7.1.0 load failed: ' +
+    String(error.message || error) + '</div>');
+}
 </script>
 
 
