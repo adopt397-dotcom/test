@@ -1,7 +1,7 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 7.1.1
+// 버전: 8.0.0
 // 날짜: 2026-07-12
 // 설명: 표준 다국어 스키마 + 언어 전환 + 기존 그래픽/퀴즈 엔진 통합
 // 표준 열: N, SUBJECT, Q_EN, Q_KO, P_EN, P_KO, 1_EN~4_KO, A, E_EN, E_KO, G, D,
@@ -92,10 +92,15 @@ var API_URL = "https://script.google.com/macros/s/AKfycbwLVA2OJ3H9RAKgzP3NvCWkDC
 var ORIGINAL_API_URL = API_URL;
 var DATA_SHEET = 'sat';
 var CURRENT_SUBJECT = ''; // sat 시트 SUBJECT가 비어 있어 필터하지 않음
-var STORAGE_KEY = 'quiz_progress_main_v7_0_2';
-var TOTAL_CACHE_KEY = 'quiz_total_questions_v7_0_2_sat';
+var STORAGE_KEY = 'quiz_progress_main_v8';
+var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_sat';
 var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
 var SUPPORTED_LANGUAGES = ['EN', 'KO'];
+var MODE_STORAGE_KEY = 'quiz_mode_v8';
+var SUPPORTED_MODES = ['learn', 'study', 'exam'];
+var currentMode = (localStorage.getItem(MODE_STORAGE_KEY) || 'study').toLowerCase();
+if (SUPPORTED_MODES.indexOf(currentMode) < 0) currentMode = 'study';
+var learnRevealed = {};
 var currentLanguage = (localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'EN').toUpperCase();
 if (SUPPORTED_LANGUAGES.indexOf(currentLanguage) < 0) currentLanguage = 'EN';
 var QUESTIONS_PER_SET = 120;
@@ -462,6 +467,10 @@ DOM.timerDisplay = null;
 DOM.timerPauseBtn = null;
 DOM.timerResetBtn = null;
 DOM.languageSelector = null;
+DOM.currentSetTitle = null;
+DOM.modeButtons = null;
+DOM.modeDescription = null;
+DOM.modeStatus = null;
 
 function initDOM() {
     DOM.splashOverlay = document.getElementById('splashOverlay');
@@ -511,6 +520,10 @@ function initDOM() {
     DOM.timerPauseBtn = document.getElementById('timerPauseBtn');
     DOM.timerResetBtn = document.getElementById('timerResetBtn');
     DOM.languageSelector = document.getElementById('languageSelector');
+    DOM.currentSetTitle = document.getElementById('currentSetTitle');
+    DOM.modeButtons = document.getElementById('modeButtons');
+    DOM.modeDescription = document.getElementById('modeDescription');
+    DOM.modeStatus = document.getElementById('modeStatus');
     LOG.debug('✅ DOM initialized');
 }
 
@@ -643,6 +656,7 @@ function saveProgress() {
       masterQuestions: masterQuestions,
       timestamp: new Date().toISOString(),
       currentLanguage: currentLanguage,
+      currentMode: currentMode,
       cdnLoaded: {
         chartjs: LOADER.chartjs.loaded,
         threejs: LOADER.threejs.loaded,
@@ -669,6 +683,7 @@ function loadProgress() {
     if (!raw) return null;
     var data = JSON.parse(raw);
     if (data.currentLanguage) setLanguage(data.currentLanguage, false);
+    if (data.currentMode) setMode(data.currentMode, false);
     if (data.cdnLoaded) {
         if (data.cdnLoaded.chartjs && typeof Chart === 'undefined') data.cdnLoaded.chartjs = false;
         if (data.cdnLoaded.mathjax && typeof MathJax === 'undefined') data.cdnLoaded.mathjax = false;
@@ -875,6 +890,122 @@ function initLanguageSelector() {
   DOM.languageSelector.onchange = function() {
     setLanguage(this.value, true);
   };
+}
+
+
+// ========================================================================
+// BLOCK 0660: Learn / Study / Exam 모드
+// ========================================================================
+var MODE_INFO = {
+  learn: {
+    label: 'Learn',
+    icon: '🟢',
+    description: 'Read first, reveal the answer, and learn from the explanation.'
+  },
+  study: {
+    label: 'Study',
+    icon: '🔵',
+    description: 'Choose an answer and receive instant feedback.'
+  },
+  exam: {
+    label: 'Exam',
+    icon: '🔴',
+    description: 'Practice under test conditions. Feedback appears at the end.'
+  }
+};
+
+function getCurrentSetNumber(startNumber) {
+  var start = Number(startNumber || currentStartNumber || 1);
+  return Math.max(1, Math.ceil(start / QUESTIONS_PER_SET));
+}
+
+function updateCurrentSetTitle(startNumber) {
+  var setNumber = getCurrentSetNumber(startNumber);
+  if (DOM.currentSetTitle) DOM.currentSetTitle.textContent = String(setNumber);
+  document.title = 'Digital SAT · Set ' + setNumber;
+  return setNumber;
+}
+
+function updateModeUI() {
+  var info = MODE_INFO[currentMode] || MODE_INFO.study;
+  document.documentElement.setAttribute('data-study-mode', currentMode);
+
+  if (DOM.modeButtons) {
+    DOM.modeButtons.querySelectorAll('[data-mode]').forEach(function(button) {
+      var active = button.getAttribute('data-mode') === currentMode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  if (DOM.modeDescription) {
+    DOM.modeDescription.textContent = info.icon + ' ' + info.description;
+  }
+
+  if (DOM.modeStatus) {
+    DOM.modeStatus.textContent = info.label;
+  }
+}
+
+function setMode(mode, rerender) {
+  var next = String(mode || 'study').toLowerCase();
+  if (SUPPORTED_MODES.indexOf(next) < 0) next = 'study';
+
+  currentMode = next;
+  localStorage.setItem(MODE_STORAGE_KEY, currentMode);
+  updateModeUI();
+  saveProgress();
+
+  if (rerender !== false && currentQuestions.length && DOM.questionContainer) {
+    renderCurrentQuestion();
+  }
+
+  return currentMode;
+}
+
+function initModeSelector() {
+  if (!DOM.modeButtons) return;
+
+  DOM.modeButtons.querySelectorAll('[data-mode]').forEach(function(button) {
+    button.addEventListener('click', function() {
+      setMode(this.getAttribute('data-mode'), true);
+    });
+  });
+
+  updateModeUI();
+}
+
+function isLearnRevealed(index) {
+  return !!learnRevealed[String(index)];
+}
+
+function revealLearnAnswer() {
+  learnRevealed[String(currentIndex)] = true;
+  renderCurrentQuestion();
+  showExplanation(true);
+  saveProgressImmediate();
+}
+
+function getCorrectChoiceNumber(q) {
+  return parseInt(q && q.answer, 10);
+}
+
+function renderLearnControls(q) {
+  var revealed = isLearnRevealed(currentIndex);
+  var correctNumber = getCorrectChoiceNumber(q);
+  var correctLetter = getAnswerLetter(correctNumber);
+
+  if (!revealed) {
+    return '<div class="learn-control-panel">' +
+      '<button type="button" class="learn-show-answer-btn" onclick="revealLearnAnswer()">👁 Show Answer & Explanation</button>' +
+      '<div class="learn-hint">Try to understand the question first. No answer is required.</div>' +
+      '</div>';
+  }
+
+  return '<div class="learn-control-panel revealed">' +
+    '<div class="learn-answer-badge">Correct answer: ' + escapeHtml(correctLetter) + '</div>' +
+    '<div class="learn-hint">Read the explanation, then continue to the next question.</div>' +
+    '</div>';
 }
 
 // ========================================================================
@@ -1473,6 +1604,18 @@ function getWrongSkippedUnansweredIndices() {
 
 function showResults() {
   saveProgressImmediate();
+
+  if (currentMode === 'learn') {
+    DOM.correctCountSpan.innerHTML = Object.keys(learnRevealed).length + ' / ' + currentQuestions.length;
+    DOM.accuracyRateSpan.innerHTML = 'Learned';
+    DOM.resultGrid.innerHTML =
+      '<div class="learn-completion-message">' +
+      '<strong>📘 Learning session complete</strong><br>' +
+      'Review this set again in Study mode, then finish with Exam mode.' +
+      '</div>';
+    DOM.resultModal.style.display = 'flex';
+    return;
+  }
   var answeredCount = userAnswers.filter(function(a) { return a !== null && a !== undefined && a !== -1; }).length;
   var accuracy = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
   DOM.correctCountSpan.innerHTML = correctCount + ' / ' + answeredCount;
@@ -4194,7 +4337,11 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
       '<button onclick="submitSubjective()">Submit</button>' +
       '</div>';
   }
-  html += '</div></div>';
+  html += '</div>';
+  if (currentMode === 'learn') {
+    html += renderLearnControls(q);
+  }
+  html += '</div>';
   DOM.questionContainer.innerHTML = html;
   
   if (window.MathJax && MathJax.typesetPromise) {
@@ -4224,10 +4371,31 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
 // ========================================================================
 // BLOCK 1320: showExplanation (원본 B011)
 // ========================================================================
-function showExplanation() {
+function showExplanation(force) {
+  if (currentMode === 'exam' && force !== true) {
+    DOM.explanationBox.classList.remove('show');
+    return;
+  }
   var q = currentQuestions[currentIndex];
   var ans = userAnswers[currentIndex];
-  if (!q || ans === null || ans === undefined || ans === -1) {
+  if (!q) {
+    DOM.explanationBox.classList.remove('show');
+    return;
+  }
+
+  if (currentMode === 'learn' && force === true && isLearnRevealed(currentIndex)) {
+    var learnCorrect = getAnswerLetter(getCorrectChoiceNumber(q));
+    DOM.explanationText.innerHTML =
+      '<div class="learn-answer-badge">Correct answer: ' + escapeHtml(learnCorrect) + '</div>' +
+      renderExplanationLanguageBlock(q);
+    DOM.explanationBox.classList.add('show');
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetPromise([DOM.explanationText]).catch(console.warn);
+    }
+    return;
+  }
+
+  if (ans === null || ans === undefined || ans === -1) {
     DOM.explanationBox.classList.remove('show');
     return;
   }
@@ -4364,9 +4532,17 @@ function renderCurrentQuestion() {
     if (!choiceText) continue;
     var isSelected = (answered === choiceNum);
     var isCorrectChoice = (choiceNum === displayAnswer);
-    var showCorrect = (answered !== null && answered !== undefined && answered !== -1);
+    var learnVisible = currentMode === 'learn' && isLearnRevealed(currentIndex);
+    var studyVisible = currentMode === 'study' && answered !== null && answered !== undefined && answered !== -1;
+    var showCorrect = learnVisible || studyVisible;
     var cls = 'choice';
-    if (showCorrect) {
+
+    if (currentMode === 'exam') {
+      if (isSelected) cls += ' selected';
+    } else if (currentMode === 'learn') {
+      cls += ' disabled';
+      if (learnVisible && isCorrectChoice) cls += ' correct';
+    } else if (showCorrect) {
       cls += ' disabled';
       if (isCorrectChoice) cls += ' correct';
       if (isSelected && !isCorrectChoice) cls += ' incorrect';
@@ -4402,7 +4578,9 @@ function renderCurrentQuestion() {
     el.addEventListener('click', handleChoiceClick);
   });
   
-  if (answered !== null && answered !== undefined && answered !== -1) {
+  if (currentMode === 'learn' && isLearnRevealed(currentIndex)) {
+    showExplanation(true);
+  } else if (currentMode === 'study' && answered !== null && answered !== undefined && answered !== -1) {
     showExplanation();
   } else {
     DOM.explanationBox.classList.remove('show');
@@ -4414,9 +4592,10 @@ function renderCurrentQuestion() {
     DOM.submitBtn.style.display = 'inline-block';
     DOM.submitBtn.innerHTML = 'SUBMIT (Enter)';
     var isAnswered = (answered !== null && answered !== undefined && answered !== -1);
-    DOM.submitBtn.disabled = !isAnswered;
-    DOM.submitBtn.style.background = isAnswered ? '#27ae60' : '#95a5a6';
-    DOM.submitBtn.style.color = isAnswered ? 'white' : '#666';
+    var canSubmit = currentMode === 'learn' ? true : isAnswered;
+    DOM.submitBtn.disabled = !canSubmit;
+    DOM.submitBtn.style.background = canSubmit ? '#27ae60' : '#95a5a6';
+    DOM.submitBtn.style.color = canSubmit ? 'white' : '#666';
   } else {
     DOM.nextBtn.style.display = 'inline-block';
     DOM.nextBtn.innerHTML = 'NEXT (N)';
@@ -4432,9 +4611,32 @@ function handleChoiceClick(e) {
   var el = e.currentTarget;
   var choice = parseInt(el.getAttribute('data-choice'));
   if (isNaN(choice)) return;
+
+  if (currentMode === 'learn') {
+    revealLearnAnswer();
+    return;
+  }
+
+  var previous = userAnswers[currentIndex];
+  var correctAnswer = parseInt(currentQuestions[currentIndex].answer);
+
+  if (previous !== null && previous !== undefined && previous !== -1 && previous === correctAnswer) {
+    correctCount = Math.max(0, correctCount - 1);
+  }
+
   userAnswers[currentIndex] = choice;
-  if (choice === parseInt(currentQuestions[currentIndex].answer)) correctCount++;
+
+  if (choice === correctAnswer) {
+    correctCount++;
+  }
+
   saveProgressImmediate();
+
+  if (currentMode === 'exam') {
+    renderCurrentQuestion();
+    return;
+  }
+
   renderCurrentQuestion();
   showExplanation();
 }
@@ -4473,7 +4675,7 @@ function attachKeyboardEvents() {
     if (key === 'Enter') {
       if (currentIndex >= currentQuestions.length - 1 && DOM.submitBtn && DOM.submitBtn.style.display !== 'none') {
         var isAnswered = (userAnswers[currentIndex] !== null && userAnswers[currentIndex] !== undefined && userAnswers[currentIndex] !== -1);
-        if (isAnswered) {
+        if (currentMode === 'learn' || isAnswered) {
           event.preventDefault();
           showResults();
         }
@@ -4575,6 +4777,8 @@ function showProgressModal(saved) {
   DOM.progressModalBody.innerHTML = '<div style="padding:10px 0;">' +
     '<p style="font-size:22px;font-weight:700;color:#2c3e50;text-align:center;margin-bottom:10px;">📊 Resume Session</p>' +
     '<div style="background:#f8f9fa;border-radius:12px;padding:16px 20px;margin:15px 0;">' +
+    '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Set</span><strong>' + getCurrentSetNumber(saved.currentStartNumber || 1) + '</strong></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Mode</span><strong>' + ((MODE_INFO[saved.currentMode || currentMode] || MODE_INFO.study).label) + '</strong></div>' +
     '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Progress</span><strong>' + progress + ' / ' + total + '</strong></div>' +
     '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Answered</span><strong>' + answered + ' / ' + total + '</strong></div>' +
     '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Correct</span><strong>' + (saved.correctCount || 0) + '</strong></div>' +
@@ -4593,6 +4797,9 @@ function resumeProgress(saved) {
   currentIndex = saved.currentIndex || 0;
   correctCount = saved.correctCount || 0;
   currentStartNumber = saved.currentStartNumber || 1;
+  if (saved.currentMode) currentMode = saved.currentMode;
+  updateCurrentSetTitle(currentStartNumber);
+  updateModeUI();
   isReviewMode = saved.isReviewMode || false;
   if (saved.masterQuestions) masterQuestions = saved.masterQuestions;
   if (saved.originalQuestions) originalQuestions = saved.originalQuestions;
@@ -4645,6 +4852,8 @@ async function startQuizWithNumber(uiStartNumber) {
   }
   
   currentStartNumber = startNum;
+  learnRevealed = {};
+  updateCurrentSetTitle(currentStartNumber);
   
   var overlay = showLoadingOverlay('Loading ' + QUESTIONS_PER_SET + ' questions from ' + startNum + '...');
   try {
@@ -4675,7 +4884,11 @@ async function startQuizWithNumber(uiStartNumber) {
     loadAllLibrariesInBackground();
     
     resetTimer();
-    startTimer();
+    if (currentMode === 'exam') {
+      startTimer();
+    } else {
+      pauseTimer();
+    }
     
   } catch(err) {
     if (err.name === 'AbortError') {
@@ -4696,6 +4909,7 @@ function initialize() {
   
   initDOM();
   initLanguageSelector();
+  initModeSelector();
   initTimer();
   attachEvents();
 
@@ -4730,6 +4944,7 @@ function initialize() {
           if (!isNaN(setNum) && setNum >= 1) {
             var startNum = (setNum - 1) * QUESTIONS_PER_SET + 1;
             DOM.startNumberInput.value = startNum;
+            updateCurrentSetTitle(startNum);
             console.log('Set ' + setNum + ' selected, starting from question ' + startNum);
           }
         });
@@ -4849,6 +5064,10 @@ window.showToast = showToast;
 window.LOG = LOG;
 window.LANG = LANG;
 window.setLanguage = setLanguage;
+window.setMode = setMode;
+window.getCurrentMode = function() { return currentMode; };
+window.revealLearnAnswer = revealLearnAnswer;
+window.updateCurrentSetTitle = updateCurrentSetTitle;
 window.getCurrentLanguage = function() { return currentLanguage; };
 window.SUPPORTED_LANGUAGES = SUPPORTED_LANGUAGES;
 window.DOM = DOM;
@@ -4905,6 +5124,9 @@ export {
   loadAllLibrariesInBackground,
   showToast,
   setLanguage,
+  setMode,
+  revealLearnAnswer,
+  updateCurrentSetTitle,
   LOG,
   RendererManager
 };
