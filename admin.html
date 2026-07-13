@@ -1436,19 +1436,45 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
 
-  const tutorObserver = new MutationObserver(() => {
-    const qNumElement = document.querySelector('.q-num');
-    const botQ = document.getElementById('botQuestionNumber');
-    const botSet = document.getElementById('botSetNumber');
-    if (qNumElement && botQ) {
-      const match = qNumElement.textContent.match(/Original #(\d+)/);
-      if (match) {
-        botQ.textContent = match[1];
-        if (botSet) botSet.textContent = String(Math.max(1, Math.ceil(Number(match[1]) / 120)));
-      }
-    }
-  });
-  tutorObserver.observe(document.body, { childList:true, subtree:true, characterData:true });
+ let lastTutorQuestion = '';
+
+function updateTutorContext() {
+  const qNumElement = document.querySelector('.q-num');
+  const botQ = document.getElementById('botQuestionNumber');
+  const botSet = document.getElementById('botSetNumber');
+
+  if (!qNumElement || !botQ) return;
+
+  const match = qNumElement.textContent.match(/Original #(\d+)/);
+  if (!match) return;
+
+  const questionNumber = match[1];
+
+  if (lastTutorQuestion === questionNumber) return;
+  lastTutorQuestion = questionNumber;
+
+  if (botQ.textContent !== questionNumber) {
+    botQ.textContent = questionNumber;
+  }
+
+  const setNumber = String(
+    Math.max(1, Math.ceil(Number(questionNumber) / 120))
+  );
+
+  if (botSet && botSet.textContent !== setNumber) {
+    botSet.textContent = setNumber;
+  }
+}
+
+const tutorObserver = new MutationObserver(updateTutorContext);
+
+tutorObserver.observe(
+  document.getElementById('questionContainer'),
+  {
+    childList: true,
+    subtree: true
+  }
+);childList:true, subtree:true, characterData:true });
 
   // ============================================================
   // START 버튼 중복 클릭 방지 + 로딩 피드백
