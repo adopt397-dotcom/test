@@ -41,7 +41,7 @@
   <div class="quiz-header">
     <div class="sat-logo">
       <span class="sat-icon">📝</span>
-      <span class="sat-title">Digital SAT</span>
+      <span class="sat-title">Digital SAT <span class="set-separator">·</span> Set <span id="currentSetTitle">1</span></span>
       <span class="sat-badge">Practice</span>
     </div>
     <div class="sat-sub">Reading &amp; Writing · Math</div>
@@ -51,6 +51,15 @@
         <option value="EN">English</option>
         <option value="KO">한국어</option>
       </select>
+    </div>
+
+    <div class="learning-mode-panel">
+      <div id="modeButtons" class="mode-buttons" role="group" aria-label="Learning mode">
+        <button type="button" class="mode-btn mode-learn" data-mode="learn" aria-pressed="false">🟢 Learn</button>
+        <button type="button" class="mode-btn mode-study" data-mode="study" aria-pressed="true">🔵 Study</button>
+        <button type="button" class="mode-btn mode-exam" data-mode="exam" aria-pressed="false">🔴 Exam</button>
+      </div>
+      <div id="modeDescription" class="mode-description">🔵 Choose an answer and receive instant feedback.</div>
     </div>
   </div>
 
@@ -98,7 +107,10 @@
 
     <!-- 진행률 -->
     <div class="progress-area" style="display:none;">
-      <span class="progress-count" id="progressText">1 / 1</span>
+      <div class="progress-status-row">
+        <span class="progress-count" id="progressText">1 / 1</span>
+        <span class="mode-status-chip">Mode: <strong id="modeStatus">Study</strong></span>
+      </div>
       <div class="progress-bar-container">
         <div class="progress-bar" id="quizProgressBar"></div>
       </div>
@@ -1126,6 +1138,162 @@
   .explanation-language-content{margin-top:14px}
   .explanation-language-content .language-line-en,.explanation-language-content .language-line-ko{font-size:15px;line-height:1.7}
 
+
+  /* ============================================================
+     SAT v8.0 Learning Edition
+     ============================================================ */
+  .set-separator { color:#f5a623; -webkit-text-fill-color:#f5a623; }
+
+  .learning-mode-panel {
+    margin:14px auto 0;
+    max-width:620px;
+    position:relative;
+    z-index:2;
+  }
+  .mode-buttons {
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    padding:6px;
+    border-radius:16px;
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.14);
+  }
+  .mode-btn {
+    border:1px solid transparent;
+    border-radius:12px;
+    padding:10px 8px;
+    font-weight:800;
+    font-size:14px;
+    cursor:pointer;
+    color:#fff;
+    background:rgba(255,255,255,.08);
+    transition:transform .18s,background .18s,box-shadow .18s;
+  }
+  .mode-btn:hover { transform:translateY(-1px); background:rgba(255,255,255,.15); }
+  .mode-btn.active { background:#fff; color:#172033; box-shadow:0 5px 18px rgba(0,0,0,.22); }
+  .mode-description {
+    padding-top:8px;
+    font-size:12px;
+    line-height:1.4;
+    color:rgba(255,255,255,.78);
+  }
+
+  html[data-study-mode="learn"] .quiz-header { border-bottom-color:#27ae60; }
+  html[data-study-mode="study"] .quiz-header { border-bottom-color:#3498db; }
+  html[data-study-mode="exam"] .quiz-header { border-bottom-color:#e74c3c; }
+
+  .progress-status-row {
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .mode-status-chip {
+    background:#fff;
+    border:1px solid #d9e0e8;
+    border-radius:30px;
+    padding:8px 16px;
+    font-size:13px;
+  }
+
+  .choice.selected {
+    border-color:#3498db !important;
+    background:#eaf4fd !important;
+    box-shadow:0 0 0 2px rgba(52,152,219,.12);
+  }
+
+  .learn-control-panel {
+    margin-top:18px;
+    padding:16px;
+    border-radius:12px;
+    background:#eefaf3;
+    border:1px solid #bfe8cf;
+    text-align:center;
+  }
+  .learn-show-answer-btn {
+    border:0;
+    border-radius:10px;
+    padding:13px 22px;
+    background:#27ae60;
+    color:#fff;
+    font-size:15px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 5px 16px rgba(39,174,96,.22);
+  }
+  .learn-show-answer-btn:hover { background:#219150; }
+  .learn-hint { margin-top:9px; color:#587063; font-size:13px; }
+  .learn-answer-badge {
+    display:inline-block;
+    padding:9px 16px;
+    border-radius:30px;
+    background:#27ae60;
+    color:#fff;
+    font-weight:800;
+    margin-bottom:10px;
+  }
+  .learn-completion-message {
+    padding:28px;
+    border-radius:14px;
+    background:#eefaf3;
+    border:1px solid #bfe8cf;
+    line-height:1.8;
+    text-align:center;
+  }
+
+  .sat-tutor-panel {
+    width:min(900px,calc(100% - 24px));
+    margin:0 auto 22px;
+    padding:20px;
+    background:#fff;
+    border-radius:0 0 16px 16px;
+    box-shadow:0 9px 24px rgba(0,0,0,.08);
+    border:1px solid #e1e6ec;
+    border-top:3px solid #f5a623;
+  }
+  .sat-tutor-header {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .sat-tutor-header h3 { margin:0; color:#1a1a2e; font-size:19px; }
+  .sat-tutor-subtitle { margin-top:3px; color:#7b8796; font-size:12px; }
+  .sat-tutor-context {
+    padding:7px 11px;
+    border-radius:20px;
+    background:#f8f9fa;
+    color:#526071;
+    font-size:12px;
+    white-space:nowrap;
+  }
+  .sat-tutor-quick-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+    margin-bottom:12px;
+  }
+  .sat-tutor-quick-actions button {
+    border:1px solid #d8dee7;
+    background:#fff;
+    color:#344054;
+    border-radius:18px;
+    padding:7px 11px;
+    cursor:pointer;
+    font-size:12px;
+    font-weight:700;
+  }
+  .sat-tutor-quick-actions button:hover { border-color:#f5a623; background:#fff8eb; }
+
+  @media (max-width:640px) {
+    .mode-btn { font-size:12px; padding:9px 5px; }
+    .sat-tutor-header { flex-direction:column; }
+    .sat-tutor-context { white-space:normal; }
+  }
+
 </style>
 
 <!-- ============================================================ -->
@@ -1137,7 +1305,7 @@
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=7.1.1';
+import { initialize } from './main.js?v=8.0.0';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
@@ -1148,8 +1316,20 @@ document.addEventListener('DOMContentLoaded', () => {
 <!-- ============================================================ -->
 <!-- BLOCK 08: SAT Chatbot (Full English, Enter Key, Auto-detect) -->
 <!-- ============================================================ -->
-<div style="max-width:700px;margin:20px auto;padding:20px;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:2px solid #f5a623;">
-  <h3 style="margin-bottom:15px;color:#1a1a2e;">🤖 SAT Chatbot</h3>
+<div id="satTutorPanel" class="sat-tutor-panel">
+  <div class="sat-tutor-header">
+    <div>
+      <h3>💬 SAT Tutor AI</h3>
+      <div class="sat-tutor-subtitle">Ask about the current question</div>
+    </div>
+    <div class="sat-tutor-context">Set <span id="botSetNumber">1</span> · Question <span id="botQuestionNumber">1</span></div>
+  </div>
+  <div class="sat-tutor-quick-actions">
+    <button type="button" onclick="askTutorQuick('Explain this question step by step.')">Explain</button>
+    <button type="button" onclick="askTutorQuick('Why is the correct answer correct?')">Why this answer?</button>
+    <button type="button" onclick="askTutorQuick('Explain the important vocabulary in this question.')">Vocabulary</button>
+    <button type="button" onclick="askTutorQuick('Give me one similar practice question.')">Similar question</button>
+  </div>
   <div style="display:flex;flex-direction:column;gap:10px;">
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <input 
@@ -1180,6 +1360,33 @@ document.addEventListener('DOMContentLoaded', () => {
   // ============================================================
   // SAT Chatbot - sendChatbotMessage()
   // ============================================================
+  function askTutorQuick(text) {
+    const input = document.getElementById('chatbotQuestion');
+    if (!input) return;
+    input.value = text;
+    sendChatbotMessage();
+  }
+
+  function getCurrentTutorContext() {
+    try {
+      const frameWindow = window;
+      const list = frameWindow.currentQuestions || [];
+      const index = Number(frameWindow.currentIndex || 0);
+      const q = list[index] || {};
+      return {
+        setNumber: Math.max(1, Math.ceil(Number(q.originalNumber || 1) / 120)),
+        questionNumber: q.originalNumber || index + 1,
+        question: q.question || '',
+        passage: q.passage || '',
+        choices: q.choices || {},
+        language: typeof frameWindow.getCurrentLanguage === 'function' ? frameWindow.getCurrentLanguage() : 'EN',
+        mode: typeof frameWindow.getCurrentMode === 'function' ? frameWindow.getCurrentMode() : 'study'
+      };
+    } catch (e) {
+      return {};
+    }
+  }
+
   async function sendChatbotMessage() {
     const questionInput = document.getElementById('chatbotQuestion');
     const responseDiv = document.getElementById('chatbotResponse');
@@ -1204,7 +1411,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('https://sat-bot-07020143.vercel.app/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problemNumber: problemNumber, question: question })
+        body: JSON.stringify({
+          problemNumber: problemNumber,
+          question: question,
+          context: getCurrentTutorContext()
+        })
       });
 
       const data = await res.json();
@@ -1223,6 +1434,21 @@ document.addEventListener('DOMContentLoaded', () => {
       questionInput.focus();
     }
   }
+
+
+  const tutorObserver = new MutationObserver(() => {
+    const qNumElement = document.querySelector('.q-num');
+    const botQ = document.getElementById('botQuestionNumber');
+    const botSet = document.getElementById('botSetNumber');
+    if (qNumElement && botQ) {
+      const match = qNumElement.textContent.match(/Original #(\d+)/);
+      if (match) {
+        botQ.textContent = match[1];
+        if (botSet) botSet.textContent = String(Math.max(1, Math.ceil(Number(match[1]) / 120)));
+      }
+    }
+  });
+  tutorObserver.observe(document.body, { childList:true, subtree:true, characterData:true });
 
   // ============================================================
   // START 버튼 중복 클릭 방지 + 로딩 피드백
