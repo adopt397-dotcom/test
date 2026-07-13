@@ -1,14 +1,15 @@
 // ================================================================
-// utils-loader.js: 시계 + 계산기 통합 (계산 중 시간 표시)
+// utils-loader.js: 고급 공학용 계산기 + 통합 시계
 // ================================================================
 (function() {
     'use strict';
 
-    // ================================================================
-    // UT-0100: CSS
-    // ================================================================
+    // ---------- CSS ----------
     const style = document.createElement('style');
     style.textContent = `
+        /* --------------------------------
+           컨테이너 및 아이콘 행
+        -------------------------------- */
         #utilsContainer {
             position: fixed;
             top: 20px;
@@ -27,8 +28,8 @@
             backdrop-filter: blur(10px);
             padding: 6px 12px;
             border-radius: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             flex-wrap: wrap;
             justify-content: flex-end;
         }
@@ -44,295 +45,198 @@
             line-height: 1;
         }
         .utils-icon-btn:hover {
-            background: rgba(245, 166, 35, 0.2);
+            background: rgba(245,166,35,0.2);
             color: #f5a623;
         }
         .utils-icon-btn.active {
             color: #f5a623;
-            background: rgba(245, 166, 35, 0.15);
+            background: rgba(245,166,35,0.15);
         }
+
+        /* --------------------------------
+           메인 패널
+        -------------------------------- */
         .utils-panel {
             background: rgba(26, 26, 46, 0.95);
             backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255,255,255,0.1);
             border-radius: 12px;
-            padding: 12px 16px;
-            min-width: 200px;
+            padding: 16px 18px;
+            min-width: 280px;
             max-width: 420px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             color: #fff;
             display: none;
             margin-top: 4px;
         }
-        .utils-panel.visible {
-            display: block;
-        }
+        .utils-panel.visible { display: block; }
         .utils-panel-title {
-            font-size: 0.8rem;
-            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.3);
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             letter-spacing: 2px;
             text-transform: uppercase;
         }
-        .util-btn {
-            padding: 8px 12px;
-            background: #f5a623;
-            border: none;
+
+        /* --------------------------------
+           시계 / 타이머 영역
+        -------------------------------- */
+        .clock-area {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: rgba(0,0,0,0.2);
             border-radius: 8px;
-            color: #fff;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
+            padding: 6px 12px;
+            margin-bottom: 12px;
         }
-        .util-btn:hover {
-            background: #e0951f;
-        }
-        .util-btn-secondary {
-            background: rgba(255, 255, 255, 0.1);
-        }
-        .util-btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-        .util-btn-green {
-            background: #27ae60;
-        }
-        .util-btn-green:hover {
-            background: #1e8449;
-        }
-        .util-btn-red {
-            background: #e74c3c;
-        }
-        .util-btn-red:hover {
-            background: #c0392b;
-        }
-        .util-input {
-            width: 100%;
-            padding: 8px 12px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            color: #fff;
-            font-size: 0.95rem;
-            font-family: inherit;
-        }
-        .util-input:focus {
-            outline: none;
-            border-color: #f5a623;
-        }
-        .util-input-small {
-            width: 70px;
-            text-align: center;
-            display: inline-block;
-        }
-        .util-select {
-            padding: 8px 12px;
-            border-radius: 8px;
-            background: rgba(0, 0, 0, 0.3);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            font-family: inherit;
-            width: 100%;
-        }
-        .util-select:focus {
-            outline: none;
-            border-color: #f5a623;
-        }
-        .util-display {
-            text-align: center;
-            font-size: 2rem;
+        .clock-display {
+            font-size: 1.5rem;
             font-weight: 700;
             color: #f5a623;
-            padding: 10px 0;
             font-variant-numeric: tabular-nums;
+            letter-spacing: 1px;
+            min-width: 100px;
         }
-        .util-flex {
+        .clock-controls {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
         }
-        .util-flex > * {
-            flex: 1;
-        }
-        .util-textarea {
-            width: 100%;
-            min-height: 100px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+        .clock-controls button {
+            background: rgba(255,255,255,0.06);
+            border: none;
             color: #fff;
-            padding: 10px;
-            font-size: 0.95rem;
-            resize: vertical;
-            font-family: inherit;
-        }
-        .util-textarea:focus {
-            outline: none;
-            border-color: #f5a623;
-        }
-        .util-grid {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 6px;
-        }
-        .util-grid button {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 8px;
-            color: #fff;
-            font-size: 1rem;
-            font-weight: 600;
-            padding: 8px 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
             cursor: pointer;
-            transition: all 0.15s;
-            min-height: 38px;
+            transition: 0.15s;
         }
-        .util-grid button:hover {
-            background: rgba(245, 166, 35, 0.15);
-            border-color: rgba(245, 166, 35, 0.3);
-        }
-        .util-grid button:active {
-            transform: scale(0.95);
-        }
-        .util-grid .op {
+        .clock-controls button:hover {
+            background: rgba(245,166,35,0.2);
             color: #f5a623;
         }
-        .util-grid .del {
-            color: #ff6b6b;
+        .clock-controls button.active-mode {
+            background: rgba(245,166,35,0.25);
+            color: #f5a623;
         }
-        .util-grid .func {
-            color: #7ec8e3;
-            font-size: 0.8rem;
-        }
-        .util-result {
-            background: rgba(0, 0, 0, 0.3);
+
+        /* --------------------------------
+           계산기 영역
+        -------------------------------- */
+        .calc-display {
+            background: rgba(0,0,0,0.4);
             border-radius: 8px;
-            padding: 10px 14px;
+            padding: 12px 14px;
             margin-bottom: 10px;
             text-align: right;
-            font-size: 1.4rem;
+            font-size: 1.6rem;
             font-weight: 600;
             color: #fff;
             font-family: 'Courier New', monospace;
-            min-height: 48px;
+            min-height: 56px;
             word-break: break-all;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255,255,255,0.05);
+            position: relative;
         }
-        .util-clock-mini {
-            text-align: center;
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.4);
-            padding: 4px 0 8px 0;
-            letter-spacing: 1px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            margin-bottom: 10px;
+        .calc-display .sub {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.3);
+            position: absolute;
+            top: 4px;
+            right: 14px;
+            font-weight: 400;
         }
-        .util-clock-mini span {
-            color: #f5a623;
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 5px;
         }
-        .util-tabs {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            padding: 4px;
-        }
-        .util-tab {
-            flex: 1;
-            padding: 6px 0;
-            border: none;
+        .calc-grid button {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.04);
             border-radius: 6px;
-            background: transparent;
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 0.8rem;
-            font-weight: 600;
+            color: #fff;
+            font-size: 0.95rem;
+            font-weight: 500;
+            padding: 10px 0;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.1s;
+            min-height: 38px;
         }
-        .util-tab.active {
-            background: rgba(245, 166, 35, 0.2);
-            color: #f5a623;
+        .calc-grid button:hover {
+            background: rgba(245,166,35,0.15);
+            border-color: rgba(245,166,35,0.2);
         }
-        .util-tab:hover:not(.active) {
-            background: rgba(255, 255, 255, 0.05);
+        .calc-grid button:active {
+            transform: scale(0.94);
         }
-        .util-lap-list {
-            max-height: 80px;
+        .calc-grid .op { color: #f5a623; }
+        .calc-grid .del { color: #ff6b6b; }
+        .calc-grid .func { color: #7ec8e3; font-size: 0.8rem; }
+        .calc-grid .eq { background: rgba(245,166,35,0.2); color: #f5a623; }
+
+        /* 계산 기록 (히스토리) */
+        .calc-history {
+            max-height: 60px;
             overflow-y: auto;
-            font-size: 0.8rem;
-            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.3);
             margin-top: 6px;
-            padding: 4px 8px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 6px;
+            padding: 4px 6px;
+            background: rgba(0,0,0,0.15);
+            border-radius: 4px;
+            text-align: right;
         }
-        .util-lap-list div {
+        .calc-history div {
             padding: 2px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            cursor: pointer;
         }
-        .util-lap-list .highlight {
+        .calc-history div:hover {
             color: #f5a623;
         }
+
+        /* 반응형 */
         @media (max-width: 600px) {
-            #utilsContainer {
-                top: 10px;
-                right: 10px;
-                left: 10px;
-            }
-            .utils-icon-row {
-                justify-content: flex-end;
-                padding: 4px 10px;
-            }
-            .utils-icon-btn {
-                font-size: 1.2rem;
-            }
-            .utils-panel {
-                min-width: unset;
-                width: 100%;
-                max-width: 360px;
-            }
-            .util-display {
-                font-size: 1.6rem;
-            }
+            #utilsContainer { top: 10px; right: 10px; left: 10px; }
+            .utils-icon-row { justify-content: flex-end; padding: 4px 10px; }
+            .utils-icon-btn { font-size: 1.2rem; }
+            .utils-panel { min-width: unset; width: 100%; max-width: 360px; padding: 12px; }
+            .clock-display { font-size: 1.2rem; min-width: 70px; }
+            .calc-display { font-size: 1.3rem; min-height: 44px; padding: 8px 10px; }
+            .calc-grid button { font-size: 0.8rem; padding: 6px 0; min-height: 32px; }
         }
     `;
     document.head.appendChild(style);
 
-    // ================================================================
-    // UT-0200: HTML 구조
-    // ================================================================
+    // ---------- HTML 구조 ----------
     const container = document.createElement('div');
     container.id = 'utilsContainer';
     container.innerHTML = `
         <div class="utils-icon-row" id="utilsIconRow">
-            <button class="utils-icon-btn" data-util="clock" title="Timer / Stopwatch">⏱️</button>
-            <button class="utils-icon-btn" data-util="calculator" title="Calculator">🔢</button>
+            <button class="utils-icon-btn" data-util="allinone" title="Calculator + Clock">🧮</button>
             <button class="utils-icon-btn" data-util="memo" title="Memo">📝</button>
             <button class="utils-icon-btn" data-util="unit" title="Unit Converter">📐</button>
         </div>
         <div class="utils-panel" id="utilsPanel">
-            <div class="utils-panel-title" id="utilsPanelTitle">📦 Utilities</div>
-            <div id="utilsPanelContent">
-                <p style="color:rgba(255,255,255,0.4);text-align:center;font-size:0.9rem;">Click an icon</p>
-            </div>
+            <div class="utils-panel-title" id="utilsPanelTitle">🧮 All-in-One</div>
+            <div id="utilsPanelContent"></div>
         </div>
     `;
     document.body.appendChild(container);
 
-    // ================================================================
-    // UT-0300: DOM 참조
-    // ================================================================
+    // ---------- DOM 참조 ----------
     const panel = document.getElementById('utilsPanel');
     const panelTitle = document.getElementById('utilsPanelTitle');
     const panelContent = document.getElementById('utilsPanelContent');
     let currentUtil = null;
     let cleanupFn = null;
 
-    // ================================================================
-    // UT-0400: 공통 시계 상태 (전역)
-    // ================================================================
+    // ---------- 전역 시계 상태 ----------
     let globalTimerSeconds = parseInt(localStorage.getItem('util_timer_seconds')) || 134 * 60;
     let globalTimerInterval = null;
     let globalTimerRunning = false;
@@ -345,10 +249,8 @@
     }
 
     function updateGlobalTimerDisplay() {
-        const displays = document.querySelectorAll('.util-clock-mini-display, .util-timer-main-display');
-        displays.forEach(el => {
-            el.textContent = formatTime(globalTimerSeconds);
-        });
+        const el = document.getElementById('allinoneClockDisplay');
+        if (el) el.textContent = formatTime(globalTimerSeconds);
         localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
     }
 
@@ -376,288 +278,394 @@
         }
     }
 
-    function resetGlobalTimer() {
+    function resetGlobalTimerTo(seconds) {
         stopGlobalTimer();
-        globalTimerSeconds = parseInt(localStorage.getItem('util_timer_seconds')) || 134 * 60;
+        globalTimerSeconds = seconds || 134 * 60;
         updateGlobalTimerDisplay();
+        localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
     }
 
-    // ================================================================
-    // UT-0410: 통합 타이머 + 스톱워치
-    // ================================================================
+    // ---------- 올인원 유틸리티 ----------
     const utils = {
-        clock: {
-            name: '⏱️ Timer / Stopwatch',
+        allinone: {
+            name: '🧮 Calculator + Clock',
             load: function() {
-                let mode = 'timer';
-                let swMs = 0;
-                let running = false;
-                let interval = null;
-                let lapStartMs = 0;
-                let laps = [];
+                // ---- 계산기 상태 ----
+                let expression = '';
+                let displayValue = '0';
+                let isNewInput = true;
+                let memory = null;
+                let history = JSON.parse(localStorage.getItem('calc_history') || '[]');
+                let ans = 0;
+                let angleMode = 'deg'; // 'deg' or 'rad'
 
+                // ---- UI 렌더링 ----
                 panelContent.innerHTML = `
-                    <div class="util-tabs" id="utilTimeTabs">
-                        <button class="util-tab active" data-mode="timer">⏱️ Timer</button>
-                        <button class="util-tab" data-mode="stopwatch">⏱️ Stopwatch</button>
-                    </div>
-                    <div id="utilTimeContent">
-                        <div id="utilTimerMode">
-                            <div class="util-display"><span class="util-timer-main-display" id="utilTimerDisplay">${formatTime(globalTimerSeconds)}</span></div>
-                            <div class="util-flex" style="justify-content:center;gap:8px;margin-bottom:8px;">
-                                <input class="util-input util-input-small" id="utilTimerHours" type="number" min="0" max="99" value="${Math.floor(globalTimerSeconds / 3600)}" placeholder="Hr">
-                                <span style="color:#fff;">hr</span>
-                                <input class="util-input util-input-small" id="utilTimerMinutes" type="number" min="0" max="59" value="${Math.floor((globalTimerSeconds % 3600) / 60)}" placeholder="Min">
-                                <span style="color:#fff;">min</span>
-                                <button class="util-btn util-btn-secondary" id="utilTimerSet">Set</button>
-                            </div>
-                            <div class="util-flex">
-                                <button class="util-btn util-btn-green" id="utilTimerStart">▶ Start</button>
-                                <button class="util-btn util-btn-red" id="utilTimerStop">⏹ Stop</button>
-                                <button class="util-btn util-btn-secondary" id="utilTimerReset">↺ Reset</button>
-                            </div>
-                        </div>
-                        <div id="utilStopwatchMode" style="display:none;">
-                            <div class="util-display" id="utilSwDisplay">00:00.0</div>
-                            <div class="util-flex">
-                                <button class="util-btn util-btn-green" id="utilSwStart">▶ Start</button>
-                                <button class="util-btn util-btn-red" id="utilSwStop">⏹ Stop</button>
-                                <button class="util-btn util-btn-secondary" id="utilSwLap">📌 Lap</button>
-                                <button class="util-btn util-btn-secondary" id="utilSwReset">↺ Reset</button>
-                            </div>
-                            <div class="util-lap-list" id="utilSwLapList"></div>
+                    <!-- 시계/타이머 영역 -->
+                    <div class="clock-area">
+                        <span class="clock-display" id="allinoneClockDisplay">${formatTime(globalTimerSeconds)}</span>
+                        <div class="clock-controls">
+                            <button id="clockSetBtn">⏱️ Set</button>
+                            <button id="clockStartBtn">▶</button>
+                            <button id="clockStopBtn">⏹</button>
+                            <button id="clockResetBtn">↺</button>
                         </div>
                     </div>
+                    <!-- 계산기 영역 -->
+                    <div class="calc-display" id="calcDisplay">
+                        <span class="sub" id="calcAngleLabel">DEG</span>
+                        <span id="calcDisplayText">0</span>
+                    </div>
+                    <div class="calc-grid" id="calcGrid">
+                        <!-- 1행: 공학 함수 + 모드 -->
+                        <button class="func" data-action="sin">sin</button>
+                        <button class="func" data-action="cos">cos</button>
+                        <button class="func" data-action="tan">tan</button>
+                        <button class="func" data-action="log">log</button>
+                        <button class="func" data-action="ln">ln</button>
+                        <button class="func" data-action="sqrt">√</button>
+                        <!-- 2행 -->
+                        <button data-action="7">7</button>
+                        <button data-action="8">8</button>
+                        <button data-action="9">9</button>
+                        <button class="op" data-action="/">÷</button>
+                        <button class="op" data-action="*">×</button>
+                        <button class="del" data-action="backspace">⌫</button>
+                        <!-- 3행 -->
+                        <button data-action="4">4</button>
+                        <button data-action="5">5</button>
+                        <button data-action="6">6</button>
+                        <button class="op" data-action="-">−</button>
+                        <button class="op" data-action="+">+</button>
+                        <button class="del" data-action="clear">C</button>
+                        <!-- 4행 -->
+                        <button data-action="1">1</button>
+                        <button data-action="2">2</button>
+                        <button data-action="3">3</button>
+                        <button data-action="(">(</button>
+                        <button data-action=")">)</button>
+                        <button class="eq" data-action="=">=</button>
+                        <!-- 5행 -->
+                        <button data-action="0">0</button>
+                        <button data-action=".">.</button>
+                        <button class="func" data-action="pi">π</button>
+                        <button class="func" data-action="e">e</button>
+                        <button class="func" data-action="^">x^y</button>
+                        <button class="func" data-action="%">%</button>
+                        <!-- 6행: Ans, 모드, 메모리 -->
+                        <button class="func" data-action="ans">Ans</button>
+                        <button class="func" data-action="degrad">DEG/RAD</button>
+                        <button class="func" data-action="m+">M+</button>
+                        <button class="func" data-action="m-">M-</button>
+                        <button class="func" data-action="mr">MR</button>
+                        <button class="func" data-action="mc">MC</button>
+                    </div>
+                    <!-- 계산 기록 -->
+                    <div class="calc-history" id="calcHistory"></div>
                 `;
 
-                const timerDisplay = document.getElementById('utilTimerDisplay');
-                const timerHours = document.getElementById('utilTimerHours');
-                const timerMinutes = document.getElementById('utilTimerMinutes');
-                const timerSetBtn = document.getElementById('utilTimerSet');
-                const timerStartBtn = document.getElementById('utilTimerStart');
-                const timerStopBtn = document.getElementById('utilTimerStop');
-                const timerResetBtn = document.getElementById('utilTimerReset');
-                const swDisplay = document.getElementById('utilSwDisplay');
-                const swStartBtn = document.getElementById('utilSwStart');
-                const swStopBtn = document.getElementById('utilSwStop');
-                const swLapBtn = document.getElementById('utilSwLap');
-                const swResetBtn = document.getElementById('utilSwReset');
-                const swLapList = document.getElementById('utilSwLapList');
-                const tabs = document.querySelectorAll('#utilTimeTabs .util-tab');
-                const timerMode = document.getElementById('utilTimerMode');
-                const stopwatchMode = document.getElementById('utilStopwatchMode');
+                // ---- DOM 요소 ----
+                const displayText = document.getElementById('calcDisplayText');
+                const angleLabel = document.getElementById('calcAngleLabel');
+                const historyContainer = document.getElementById('calcHistory');
+                const clockDisplay = document.getElementById('allinoneClockDisplay');
 
-                function formatSw(ms) {
-                    const m = String(Math.floor(ms / 60000)).padStart(2, '0');
-                    const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
-                    const d = String(Math.floor((ms % 1000) / 100));
-                    return m + ':' + s + '.' + d;
+                // ---- 업데이트 함수 ----
+                function updateDisplay() {
+                    displayText.textContent = displayValue;
                 }
 
-                function updateTimerDisplay() {
-                    timerDisplay.textContent = formatTime(globalTimerSeconds);
-                }
-
-                function updateSwDisplay() {
-                    swDisplay.textContent = formatSw(swMs);
-                }
-
-                function updateLapList() {
-                    swLapList.innerHTML = laps.map((l, i) =>
-                        `<div><span class="highlight">Lap ${i+1}</span> ${formatSw(l)}</div>`
+                function updateHistory() {
+                    historyContainer.innerHTML = history.slice(-5).reverse().map(h =>
+                        `<div data-expr="${h.expr}" data-result="${h.result}">${h.expr} = ${h.result}</div>`
                     ).join('');
-                    if (laps.length === 0) {
-                        swLapList.innerHTML = '<div style="color:rgba(255,255,255,0.2);">No laps recorded</div>';
+                    // 기록 클릭 시 재사용
+                    historyContainer.querySelectorAll('div').forEach(el => {
+                        el.addEventListener('click', () => {
+                            const result = el.dataset.result;
+                            if (result) {
+                                displayValue = result;
+                                expression = result;
+                                isNewInput = true;
+                                updateDisplay();
+                            }
+                        });
+                    });
+                }
+
+                function addHistory(expr, result) {
+                    history.push({ expr: expr.trim(), result: result.trim() });
+                    if (history.length > 20) history.shift();
+                    localStorage.setItem('calc_history', JSON.stringify(history));
+                    updateHistory();
+                }
+
+                function setAngleMode(mode) {
+                    angleMode = mode;
+                    angleLabel.textContent = mode.toUpperCase();
+                }
+
+                // ---- 계산 엔진 ----
+                function evaluate(expr) {
+                    try {
+                        let sanitized = expr
+                            .replace(/sin\(/g, 'Math.sin(')
+                            .replace(/cos\(/g, 'Math.cos(')
+                            .replace(/tan\(/g, 'Math.tan(')
+                            .replace(/log\(/g, 'Math.log10(')
+                            .replace(/ln\(/g, 'Math.log(')
+                            .replace(/sqrt\(/g, 'Math.sqrt(')
+                            .replace(/π/g, 'Math.PI')
+                            .replace(/e(?![xp])/g, 'Math.E')
+                            .replace(/\^/g, '**')
+                            .replace(/ans/g, '(' + ans + ')');
+
+                        // 각도 변환 (sin/cos/tan)
+                        if (angleMode === 'deg') {
+                            sanitized = sanitized
+                                .replace(/Math\.sin\(/g, 'Math.sin(deg2rad(')
+                                .replace(/Math\.cos\(/g, 'Math.cos(deg2rad(')
+                                .replace(/Math\.tan\(/g, 'Math.tan(deg2rad(');
+                            // 닫는 괄호 자동 추가를 위해 함수로 감쌈
+                            // 대신 각도 변환 함수를 직접 정의
+                        }
+
+                        // 각도 변환 헬퍼 함수
+                        const fn = new Function(
+                            'deg2rad',
+                            `"use strict"; return (${sanitized})`
+                        );
+                        const deg2rad = (d) => d * Math.PI / 180;
+                        const result = fn(deg2rad);
+                        return String(result);
+                    } catch (e) {
+                        return 'Error';
                     }
                 }
 
-                function timerSet() {
-                    stopGlobalTimer();
-                    const hrs = parseInt(timerHours.value) || 0;
-                    const mins = parseInt(timerMinutes.value) || 0;
-                    globalTimerSeconds = hrs * 3600 + mins * 60;
-                    if (globalTimerSeconds < 0) globalTimerSeconds = 0;
-                    updateTimerDisplay();
-                    updateGlobalTimerDisplay();
-                    localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
-                }
-
-                function timerStart() {
-                    if (globalTimerRunning) return;
-                    if (globalTimerSeconds <= 0) return;
-                    startGlobalTimer();
-                }
-
-                function timerStop() {
-                    stopGlobalTimer();
-                }
-
-                function timerReset() {
-                    stopGlobalTimer();
-                    const hrs = parseInt(timerHours.value) || 0;
-                    const mins = parseInt(timerMinutes.value) || 0;
-                    globalTimerSeconds = hrs * 3600 + mins * 60;
-                    if (globalTimerSeconds < 0) globalTimerSeconds = 0;
-                    updateTimerDisplay();
-                    updateGlobalTimerDisplay();
-                    localStorage.setItem('util_timer_seconds', String(globalTimerSeconds));
-                }
-
-                function swStart() {
-                    if (running) return;
-                    running = true;
-                    lapStartMs = swMs;
-                    interval = setInterval(() => {
-                        swMs += 100;
-                        updateSwDisplay();
-                    }, 100);
-                }
-
-                function swStop() {
-                    running = false;
-                    if (interval) { clearInterval(interval); interval = null; }
-                }
-
-                function swLap() {
-                    if (!running) return;
-                    const lapTime = swMs - lapStartMs;
-                    laps.push(lapTime);
-                    lapStartMs = swMs;
-                    updateLapList();
-                }
-
-                function swReset() {
-                    swStop();
-                    swMs = 0;
-                    laps = [];
-                    lapStartMs = 0;
-                    updateSwDisplay();
-                    updateLapList();
-                }
-
-                function switchMode(mode) {
-                    if (running) {
-                        if (mode === 'timer') swStop();
-                        else timerStop();
+                // ---- 계산기 액션 핸들러 ----
+                function handleAction(action) {
+                    // --- 메모리 ---
+                    if (action === 'm+') {
+                        const val = parseFloat(displayValue);
+                        if (!isNaN(val)) memory = (memory || 0) + val;
+                        return;
                     }
-                    mode = mode;
-                    if (mode === 'timer') {
-                        timerMode.style.display = 'block';
-                        stopwatchMode.style.display = 'none';
-                        tabs.forEach(t => t.classList.toggle('active', t.dataset.mode === 'timer'));
-                    } else {
-                        timerMode.style.display = 'none';
-                        stopwatchMode.style.display = 'block';
-                        tabs.forEach(t => t.classList.toggle('active', t.dataset.mode === 'stopwatch'));
+                    if (action === 'm-') {
+                        const val = parseFloat(displayValue);
+                        if (!isNaN(val)) memory = (memory || 0) - val;
+                        return;
                     }
+                    if (action === 'mr') {
+                        if (memory !== null) {
+                            displayValue = String(memory);
+                            expression = String(memory);
+                            isNewInput = true;
+                            updateDisplay();
+                        }
+                        return;
+                    }
+                    if (action === 'mc') {
+                        memory = null;
+                        return;
+                    }
+
+                    // --- 각도 모드 전환 ---
+                    if (action === 'degrad') {
+                        const newMode = angleMode === 'deg' ? 'rad' : 'deg';
+                        setAngleMode(newMode);
+                        return;
+                    }
+
+                    // --- Ans ---
+                    if (action === 'ans') {
+                        if (isNewInput) {
+                            displayValue = '0';
+                            expression = '';
+                        }
+                        expression += String(ans);
+                        displayValue = expression;
+                        isNewInput = false;
+                        updateDisplay();
+                        return;
+                    }
+
+                    // --- 상수 ---
+                    if (action === 'pi') {
+                        if (isNewInput) {
+                            displayValue = '0';
+                            expression = '';
+                            isNewInput = false;
+                        }
+                        expression += 'π';
+                        displayValue = expression;
+                        updateDisplay();
+                        return;
+                    }
+                    if (action === 'e') {
+                        if (isNewInput) {
+                            displayValue = '0';
+                            expression = '';
+                            isNewInput = false;
+                        }
+                        expression += 'e';
+                        displayValue = expression;
+                        updateDisplay();
+                        return;
+                    }
+
+                    // --- 공학 함수 ---
+                    if (['sin', 'cos', 'tan', 'log', 'ln', 'sqrt'].includes(action)) {
+                        if (isNewInput) {
+                            displayValue = '0';
+                            expression = '';
+                            isNewInput = false;
+                        }
+                        expression += action + '(';
+                        displayValue = expression;
+                        updateDisplay();
+                        return;
+                    }
+
+                    // --- clear ---
+                    if (action === 'clear') {
+                        expression = '';
+                        displayValue = '0';
+                        isNewInput = true;
+                        updateDisplay();
+                        return;
+                    }
+
+                    // --- backspace ---
+                    if (action === 'backspace') {
+                        if (isNewInput) {
+                            displayValue = '0';
+                            expression = '';
+                            updateDisplay();
+                            return;
+                        }
+                        expression = expression.slice(0, -1);
+                        displayValue = expression || '0';
+                        updateDisplay();
+                        return;
+                    }
+
+                    // --- = (계산) ---
+                    if (action === '=') {
+                        if (!expression) return;
+                        const result = evaluate(expression);
+                        if (result !== 'Error' && !isNaN(parseFloat(result))) {
+                            const formatted = parseFloat(result).toString();
+                            addHistory(expression, formatted);
+                            ans = parseFloat(formatted);
+                            displayValue = formatted;
+                            expression = formatted;
+                            isNewInput = true;
+                            updateDisplay();
+                        } else {
+                            displayValue = 'Error';
+                            updateDisplay();
+                            setTimeout(() => {
+                                displayValue = '0';
+                                expression = '';
+                                isNewInput = true;
+                                updateDisplay();
+                            }, 1200);
+                        }
+                        return;
+                    }
+
+                    // --- 숫자 및 연산자 ---
+                    if (isNewInput && !'+-*/^%()'.includes(action)) {
+                        expression = '';
+                        isNewInput = false;
+                    }
+                    if (action === '%') {
+                        // 현재 값의 퍼센트 (나누기 100)
+                        const current = parseFloat(expression) || 0;
+                        expression = String(current / 100);
+                        displayValue = expression;
+                        updateDisplay();
+                        return;
+                    }
+                    expression += action;
+                    displayValue = expression;
+                    updateDisplay();
                 }
 
-                timerStartBtn.addEventListener('click', timerStart);
-                timerStopBtn.addEventListener('click', timerStop);
-                timerResetBtn.addEventListener('click', timerReset);
-                timerSetBtn.addEventListener('click', timerSet);
-
-                swStartBtn.addEventListener('click', swStart);
-                swStopBtn.addEventListener('click', swStop);
-                swLapBtn.addEventListener('click', swLap);
-                swResetBtn.addEventListener('click', swReset);
-
-                tabs.forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        switchMode(tab.dataset.mode);
+                // ---- 버튼 이벤트 ----
+                document.querySelectorAll('#calcGrid button').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const action = btn.dataset.action;
+                        handleAction(action);
                     });
                 });
 
-                timerHours.addEventListener('keydown', (e) => { if (e.key === 'Enter') timerSet(); });
-                timerMinutes.addEventListener('keydown', (e) => { if (e.key === 'Enter') timerSet(); });
-
-                updateTimerDisplay();
-                updateSwDisplay();
-                updateLapList();
-                switchMode('timer');
-
-                cleanupFn = () => {
-                    if (interval) { clearInterval(interval); interval = null; }
-                    running = false;
-                };
-            }
-        },
-
-        // -------- UT-0420: 계산기 + 미니 시계 --------
-        calculator: {
-            name: '🔢 Calculator',
-            load: function() {
-                let expr = '';
-
-                panelContent.innerHTML = `
-                    <div class="util-clock-mini">
-                        🕐 <span class="util-clock-mini-display" id="utilClockMiniDisplay">${formatTime(globalTimerSeconds)}</span>
-                    </div>
-                    <div class="util-result" id="utilCalcDisplay">0</div>
-                    <div class="util-grid">
-                        ${['sin','cos','tan','log','ln','sqrt'].map(v => `<button data-calc="${v}" class="func">${v}</button>`).join('')}
-                        ${['7','8','9','/','*','⌫'].map(v => `<button data-calc="${v==='⌫'?'backspace':v}" ${['/','*'].includes(v)?'class="op"':''} ${v==='⌫'?'class="del"':''}>${v}</button>`).join('')}
-                        ${['4','5','6','-','+','C'].map(v => `<button data-calc="${v==='C'?'clear':v}" ${['-','+'].includes(v)?'class="op"':''} ${v==='C'?'class="del"':''}>${v}</button>`).join('')}
-                        ${['1','2','3','(',')','='].map(v => `<button data-calc="${v}" ${v==='='?'class="op"':''}>${v}</button>`).join('')}
-                        ${['0','.','π','e','^','%'].map(v => `<button data-calc="${v}" ${['π','e','^','%'].includes(v)?'class="func"':''}>${v}</button>`).join('')}
-                    </div>
-                `;
-
-                const display = document.getElementById('utilCalcDisplay');
-                const miniClockDisplay = document.getElementById('utilClockMiniDisplay');
-
-                // 미니 시계 업데이트를 위한 전용 인터벌 (1초)
-                const miniClockInterval = setInterval(() => {
-                    if (miniClockDisplay) {
-                        miniClockDisplay.textContent = formatTime(globalTimerSeconds);
-                    }
-                }, 1000);
-
-                const update = () => { display.textContent = expr || '0'; };
-                const handle = (val) => {
-                    if (val === 'clear') { expr = ''; update(); return; }
-                    if (val === 'backspace') { expr = expr.slice(0, -1); update(); return; }
-                    if (val === '=') {
-                        try {
-                            let e = expr.replace(/sin\(/g,'Math.sin(').replace(/cos\(/g,'Math.cos(').replace(/tan\(/g,'Math.tan(').replace(/log\(/g,'Math.log10(').replace(/ln\(/g,'Math.log(').replace(/sqrt\(/g,'Math.sqrt(').replace(/π/g,'Math.PI').replace(/e(?![xp])/g,'Math.E').replace(/\^/g,'**');
-                            const result = Function('"use strict"; return (' + e + ')')();
-                            expr = String(result); update();
-                        } catch(e) { expr = 'Error'; update(); setTimeout(() => { expr = ''; update(); }, 1500); }
-                        return;
-                    }
-                    const map = { 'sin':'sin(','cos':'cos(','tan':'tan(','log':'log(','ln':'ln(','sqrt':'sqrt(','π':'π','e':'e' };
-                    expr += map[val] || val;
-                    update();
-                };
-                panelContent.querySelectorAll('[data-calc]').forEach(btn => {
-                    btn.addEventListener('click', () => handle(btn.dataset.calc));
-                });
+                // ---- 키보드 지원 ----
                 const keyHandler = (e) => {
                     const k = e.key;
-                    if ('0123456789.+-*/'.includes(k)) handle(k);
-                    if (k === 'Enter' || k === '=') handle('=');
-                    if (k === 'Backspace') handle('backspace');
-                    if (k === 'Escape') handle('clear');
-                    if (k === '(' || k === ')') handle(k);
-                    if (k === '%') handle('%');
+                    if (k >= '0' && k <= '9') handleAction(k);
+                    if (k === '.') handleAction('.');
+                    if (k === '+') handleAction('+');
+                    if (k === '-') handleAction('-');
+                    if (k === '*') handleAction('*');
+                    if (k === '/') handleAction('/');
+                    if (k === 'Enter' || k === '=') { e.preventDefault(); handleAction('='); }
+                    if (k === 'Backspace') { e.preventDefault(); handleAction('backspace'); }
+                    if (k === 'Escape') { handleAction('clear'); }
+                    if (k === '(') handleAction('(');
+                    if (k === ')') handleAction(')');
+                    if (k === '%') handleAction('%');
+                    if (k === '^') handleAction('^');
                 };
                 document.addEventListener('keydown', keyHandler);
 
+                // ---- 시계 컨트롤 ----
+                // Set 버튼: 사용자 설정 (모달 또는 간단 입력)
+                document.getElementById('clockSetBtn').addEventListener('click', () => {
+                    const input = prompt('Set timer (minutes):', Math.floor(globalTimerSeconds / 60));
+                    if (input !== null) {
+                        const mins = parseInt(input);
+                        if (!isNaN(mins) && mins >= 0) {
+                            resetGlobalTimerTo(mins * 60);
+                        }
+                    }
+                });
+                document.getElementById('clockStartBtn').addEventListener('click', () => {
+                    if (!globalTimerRunning) startGlobalTimer();
+                });
+                document.getElementById('clockStopBtn').addEventListener('click', stopGlobalTimer);
+                document.getElementById('clockResetBtn').addEventListener('click', () => {
+                    resetGlobalTimerTo(parseInt(localStorage.getItem('util_timer_seconds')) || 134 * 60);
+                });
+
+                // ---- 초기화 ----
+                setAngleMode('deg');
+                updateDisplay();
+                updateHistory();
+
+                // 시계 업데이트 인터벌
+                const clockInterval = setInterval(() => {
+                    const el = document.getElementById('allinoneClockDisplay');
+                    if (el) el.textContent = formatTime(globalTimerSeconds);
+                }, 1000);
+
+                // ---- 정리 ----
                 cleanupFn = () => {
                     document.removeEventListener('keydown', keyHandler);
-                    clearInterval(miniClockInterval);
+                    clearInterval(clockInterval);
                 };
             }
         },
 
-        // -------- UT-0430: 메모장 --------
+        // -------- 메모장 --------
         memo: {
             name: '📝 Memo',
             load: function() {
                 const saved = localStorage.getItem('util_memo') || '';
                 panelContent.innerHTML = `
                     <textarea class="util-textarea" id="utilMemoInput">${saved}</textarea>
-                    <div class="util-flex" style="margin-top:8px;">
+                    <div style="display:flex;gap:8px;margin-top:8px;">
                         <button class="util-btn" id="utilMemoSave">💾 Save</button>
                         <button class="util-btn util-btn-secondary" id="utilMemoClear">🗑️ Clear</button>
                     </div>
@@ -677,7 +685,7 @@
             }
         },
 
-        // -------- UT-0440: 단위 변환기 --------
+        // -------- 단위 변환기 --------
         unit: {
             name: '📐 Unit Converter',
             load: function() {
@@ -693,7 +701,7 @@
                             <option value="weight">⚖️ Weight</option>
                             <option value="temperature">🌡️ Temperature</option>
                         </select>
-                        <div class="util-flex">
+                        <div style="display:flex;gap:8px;">
                             <input class="util-input" id="unitInput" type="number" value="1" style="flex:1;">
                             <span style="color:#f5a623;font-weight:600;padding:8px;">=</span>
                             <input class="util-input" id="unitOutput" type="text" readonly style="flex:2;color:#f5a623;background:rgba(0,0,0,0.2);">
@@ -723,9 +731,7 @@
         }
     };
 
-    // ================================================================
-    // UT-0500: 유틸리티 로더
-    // ================================================================
+    // ---------- 유틸리티 로더 ----------
     function loadUtil(key) {
         if (cleanupFn) { cleanupFn(); cleanupFn = null; }
         const util = utils[key];
@@ -739,9 +745,7 @@
         util.load();
     }
 
-    // ================================================================
-    // UT-0600: 이벤트
-    // ================================================================
+    // ---------- 이벤트 ----------
     document.querySelectorAll('.utils-icon-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const key = btn.dataset.util;
@@ -756,8 +760,8 @@
         });
     });
 
-    // 글로벌 타이머 초기화
+    // 초기 시계 표시
     updateGlobalTimerDisplay();
 
-    console.log('✅ utils-loader.js loaded (Timer + Calculator sync)');
+    console.log('✅ utils-loader.js loaded (Advanced Engineering Calculator + Clock)');
 })();
