@@ -1,7 +1,7 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 7.1.0
+// 버전: 7.1.1
 // 날짜: 2026-07-12
 // 설명: 표준 다국어 스키마 + 언어 전환 + 기존 그래픽/퀴즈 엔진 통합
 // 표준 열: N, SUBJECT, Q_EN, Q_KO, P_EN, P_KO, 1_EN~4_KO, A, E_EN, E_KO, G, D,
@@ -92,10 +92,9 @@ var API_URL = "https://script.google.com/macros/s/AKfycbwLVA2OJ3H9RAKgzP3NvCWkDC
 var ORIGINAL_API_URL = API_URL;
 var DATA_SHEET = 'sat';
 var CURRENT_SUBJECT = ''; // sat 시트 SUBJECT가 비어 있어 필터하지 않음
-var STORAGE_KEY = 'quiz_progress_main_v7_1_0';
-var TOTAL_CACHE_KEY = 'quiz_total_questions_v7_1_0_sat';
+var STORAGE_KEY = 'quiz_progress_main_v7_0_2';
+var TOTAL_CACHE_KEY = 'quiz_total_questions_v7_0_2_sat';
 var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
-var APP_VERSION = '7.1.0';
 var SUPPORTED_LANGUAGES = ['EN', 'KO'];
 var currentLanguage = (localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'EN').toUpperCase();
 if (SUPPORTED_LANGUAGES.indexOf(currentLanguage) < 0) currentLanguage = 'EN';
@@ -112,25 +111,6 @@ var currentStartNumber = 1;
 var autoSaveInterval = null;
 var chartInstances = {};
 var DOM = {};
-
-// v7.1.0: 구버전에서 잘못 저장된 placeholder/혼합 선택지 데이터를 자동 제거
-(function purgeLegacyQuizCaches() {
-  try {
-    var keep = [STORAGE_KEY, TOTAL_CACHE_KEY, TOTAL_CACHE_KEY + '_time', LANGUAGE_STORAGE_KEY];
-    var remove = [];
-    for (var i = 0; i < localStorage.length; i++) {
-      var k = localStorage.key(i);
-      if (!k) continue;
-      if ((k.indexOf('quiz_progress_main_v7') === 0 || k.indexOf('quiz_total_questions_v7') === 0) && keep.indexOf(k) < 0) {
-        remove.push(k);
-      }
-    }
-    remove.forEach(function(k) { localStorage.removeItem(k); });
-    if (remove.length) console.log('🧹 Legacy quiz caches removed:', remove);
-  } catch (e) {
-    console.warn('Legacy cache cleanup skipped:', e);
-  }
-})();
 
 // ========================================================================
 // BLOCK 0200: CDN 폴백 체계
@@ -790,6 +770,91 @@ function getChoiceLocalizedText(q, key) {
   return cleanTextValue(value);
 }
 
+function getFieldLanguagePair(q, field) {
+  var map = (q && q.localized) || {};
+  var fieldMap = map[field] || {};
+  return {
+    EN: cleanTextValue(fieldMap.EN || (q && q[field]) || ''),
+    KO: cleanTextValue(fieldMap.KO || '')
+  };
+}
+
+function getChoiceLanguagePair(q, key) {
+  var translations = (q && q.choiceTranslations) || {};
+  var choiceMap = translations[String(key)] || {};
+  return {
+    EN: cleanTextValue(choiceMap.EN || (q && q.choices && q.choices[String(key)]) || ''),
+    KO: cleanTextValue(choiceMap.KO || '')
+  };
+}
+
+function renderBilingualTextBlock(enText, koText, className, processEnglish, processKorean) {
+  var enHtml = processEnglish ? processEnglish(enText || '') : (enText || '');
+  var koHtml = processKorean ? processKorean(koText || '') : (koText || '');
+
+  if (currentLanguage !== 'KO') {
+    return '<div class="' + className + ' language-line language-line-en">' + enHtml + '</div>';
+  }
+
+  var html = '<div class="' + className + ' bilingual-block">' +
+    '<div class="language-line language-line-en">' + enHtml + '</div>';
+
+  if (koText && String(koText).trim() !== '' && koText !== enText) {
+    html += '<div class="language-line language-line-ko">' + koHtml + '</div>';
+  }
+
+  return html + '</div>';
+}
+
+function renderQuestionLanguageBlock(q, isMath) {
+  var pair = getFieldLanguagePair(q, 'question');
+  return renderBilingualTextBlock(
+    pair.EN || 'No question text',
+    pair.KO,
+    'question-text',
+    wrapPowerExpressionsSafely,
+    wrapPowerExpressionsSafely
+  );
+}
+
+function renderPassageLanguageBlock(q, isMath) {
+  var pair = getFieldLanguagePair(q, 'passage');
+  if (!pair.EN || pair.EN.trim() === '' || pair.EN.trim() === 'No passage.') return '';
+  return '<div class="passage-language-card">' +
+    renderBilingualTextBlock(
+      pair.EN,
+      pair.KO,
+      'passage-language-content',
+      function(v) { return renderWithEditingMarks(v, isMath); },
+      function(v) { return renderWithEditingMarks(v, isMath); }
+    ) +
+    '</div>';
+}
+
+function renderChoiceLanguageBlock(q, key) {
+  var pair = getChoiceLanguagePair(q, key);
+  if (!pair.EN) return '';
+  return renderBilingualTextBlock(
+    pair.EN,
+    pair.KO,
+    'choice-language-content math-content',
+    wrapPowerExpressionsSafely,
+    wrapPowerExpressionsSafely
+  );
+}
+
+function renderExplanationLanguageBlock(q) {
+  var pair = getFieldLanguagePair(q, 'explanation');
+  if (!pair.EN) pair.EN = LANG.noExplanation;
+  return renderBilingualTextBlock(
+    pair.EN,
+    pair.KO,
+    'explanation-language-content math-content',
+    escapeHtml,
+    escapeHtml
+  );
+}
+
 function setLanguage(language, rerender) {
   var next = String(language || 'EN').toUpperCase();
   if (SUPPORTED_LANGUAGES.indexOf(next) < 0) next = 'EN';
@@ -1036,10 +1101,7 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                     }
                 };
 
-                if (!localized.question.EN) {
-                    console.error('❌ Q_EN missing in API row:', parsed);
-                    throw new Error('Q_EN missing for row ' + (uiStartNumber + idx));
-                }
+                if (!localized.question.EN) localized.question.EN = 'Question ' + (uiStartNumber + idx);
                 if (!localized.passage.EN) localized.passage.EN = '';
                 if (!localized.explanation.EN) localized.explanation.EN = 'No explanation available.';
 
@@ -1123,8 +1185,6 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
                 });
 
                 if (idx === 0) {
-                    console.log('🚀 SAT APP VERSION:', APP_VERSION);
-                    console.log('🧾 API raw first row keys:', Object.keys(parsed));
                     console.log('📝 First question mapped:', processed[0]);
                     console.log('📝 Choices:', choices);
                     console.log('🌐 Choice translations:', choiceTranslations);
@@ -3951,7 +4011,7 @@ function renderGraphic(jsonData) {
     var parsedData = parseGraphicPayload(jsonData);
     if (!parsedData) return "";
 
-    var type = String(parsedData.type || '').trim().toLowerCase();
+    var type = String(parsedData.type || '').trim();
     if (!type) return "";
 
     // ★★★ scatter-only를 먼저 처리 (Chart.js 직접 렌더링) ★★★
@@ -4109,16 +4169,11 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
   } else {
     correctAnswerText = 'Answer not available';
   }
-  var graphicHtml = renderGraphic(q.graphic);
-  if (q.graphic) {
-    console.log('🖼️ Graphic render:', { N: q.N, rawType: typeof q.graphic, rawStart: String(q.graphic).slice(0, 80), htmlLength: graphicHtml.length });
-  }
-
   var html = '<div class="question-card">' +
     '<div class="q-num">' + headerText + '</div>' +
     passageHtml +
-    graphicHtml +
-    '<div class="question-text math-content">' + wrapPowerExpressionsSafely(getQuestionLocalizedText(q, 'question')) + '</div>';
+    renderGraphic(q.graphic) +
+    renderQuestionLanguageBlock(q, detectMathQuestion(q));
   if (isAnswered) {
     var userAns = String(answered).trim();
     var isCorrect = (userAns === correctAnswerText) || (parseFloat(userAns) === parseFloat(correctAnswerText));
@@ -4131,7 +4186,7 @@ function renderSubjectiveQuestion(q, answered, headerText, passageHtml) {
       '</div>' +
       '<div class="subjective-explanation">' +
       '<strong>Explanation</strong>' +
-      '<p style="margin-top:8px;" class="math-content">' + escapeHtml(getQuestionLocalizedText(q, 'explanation') || 'No explanation available.') + '</p>' +
+      renderExplanationLanguageBlock(q) +
       '</div>';
   } else {
     html += '<div class="subjective-input-group">' +
@@ -4189,7 +4244,6 @@ function showExplanation() {
     var userAns = String(ans).trim();
     var isCorrect = (userAns === correctAns) || (parseFloat(userAns) === parseFloat(correctAns));
     var statusColor = isCorrect ? '#27ae60' : '#e74c3c';
-    var explanationText = getQuestionLocalizedText(q, 'explanation') || LANG.noExplanation;
     DOM.explanationText.innerHTML =
       '<div style="background:' + statusColor + ';color:white;padding:8px 16px;border-radius:6px;display:inline-block;font-weight:700;margin-bottom:15px;">' +
       'Answer: ' + escapeHtml(correctAns) +
@@ -4197,7 +4251,7 @@ function showExplanation() {
       '<div style="margin-top:8px;font-size:14px;color:#555;">' +
       'Your answer: <strong>' + escapeHtml(userAns) + '</strong>' +
       '</div>' +
-      '<p style="margin-top:12px;" class="math-content">' + escapeHtml(explanationText) + '</p>';
+      renderExplanationLanguageBlock(q);
     DOM.explanationBox.classList.add('show');
     if (window.MathJax && MathJax.typesetPromise) {
       MathJax.typesetPromise([DOM.explanationText]).catch(console.warn);
@@ -4220,7 +4274,6 @@ function showExplanation() {
   var correctAnswerLetter = getAnswerLetter(displayAnswerIndex);
   var isCorrect = (ans === displayAnswerIndex);
   var statusColor = isCorrect ? '#27ae60' : '#e74c3c';
-  var explanationText = getQuestionLocalizedText(q, 'explanation') || LANG.noExplanation;
   DOM.explanationText.innerHTML =
     '<div style="background:' + statusColor + ';color:white;padding:8px 16px;border-radius:6px;display:inline-block;font-weight:700;margin-bottom:15px;">' +
     'Answer: ' + correctAnswerLetter +
@@ -4228,7 +4281,7 @@ function showExplanation() {
     '<div style="margin-top:8px;font-size:14px;color:#555;">' +
     'Your answer: <strong>' + userAnswerLetter + '</strong>' +
     '</div>' +
-    '<p style="margin-top:12px;" class="math-content">' + escapeHtml(explanationText) + '</p>';
+    renderExplanationLanguageBlock(q);
   DOM.explanationBox.classList.add('show');
   if (window.MathJax && MathJax.typesetPromise) {
     MathJax.typesetPromise([DOM.explanationText]).catch(console.warn);
@@ -4275,18 +4328,8 @@ function renderCurrentQuestion() {
   var isSubjective = !hasChoices;
   var isMath = detectMathQuestion(q);
   
-  var passageHtml = '';
-  var displayPassage = getQuestionLocalizedText(q, 'passage');
-  if (displayPassage && displayPassage.trim() !== '' && displayPassage.trim() !== 'No passage.') {
-    passageHtml = '<div style="background:#f8f9fa;padding:15px;border-radius:8px;margin:10px 0;border:1px solid #dee2e6;">' +
-      '<div style="white-space:pre-wrap;font-size:15px;line-height:1.7;">' +
-      renderWithEditingMarks(displayPassage, isMath) + '</div>' +
-      '</div>';
-  }
-  
-  // ★★★ 혼합 문장 안전 처리: 완전한 지수식만 MathJax로 감싸기 ★★★
-  var questionText = getQuestionLocalizedText(q, 'question') || 'No question text';
-  var questionDisplay = wrapPowerExpressionsSafely(questionText);
+  var passageHtml = renderPassageLanguageBlock(q, isMath);
+  var questionDisplay = renderQuestionLanguageBlock(q, isMath);
 
   if (isSubjective) {
     renderSubjectiveQuestion(q, answered, headerText, passageHtml);
@@ -4310,14 +4353,14 @@ function renderCurrentQuestion() {
     '<div class="q-num">' + headerText + '</div>' +
     passageHtml +
     renderGraphic(q.graphic) +
-    '<div class="question-text">' + questionDisplay + '</div>' +
+    questionDisplay +
     '<div class="choices">';
   
   for (var idx = 0; idx < validKeys.length; idx++) {
     var key = validKeys[idx];
     var choiceNum = parseInt(key);
     var letter = getAnswerLetter(idx + 1);
-    var choiceText = getChoiceLocalizedText(q, key);
+    var choiceText = renderChoiceLanguageBlock(q, key);
     if (!choiceText) continue;
     var isSelected = (answered === choiceNum);
     var isCorrectChoice = (choiceNum === displayAnswer);
@@ -4649,7 +4692,6 @@ async function startQuizWithNumber(uiStartNumber) {
 // BLOCK 1510: 시스템 초기화 (원본 B012 initialize)
 // ========================================================================
 function initialize() {
-  console.log('🚀 SAT main.js v' + APP_VERSION + ' loaded');
   console.log('🔧 initialize() started');
   
   initDOM();
