@@ -92,37 +92,166 @@ var LANG = {
 };
 
 // ========================================================================
-// BLOCK 0120: 시스템 상수 (원본 B002)
+// BLOCK 0120: 시스템 상수 + Multi Subject State
 // ========================================================================
+
 var API_URL = "https://script.google.com/macros/s/AKfycbwLVA2OJ3H9RAKgzP3NvCWkDCGyRIAhxT6svLU6bvUT-oq1dxrFQSJQ31vb6z7Kyxnk/exec";
+
 var ORIGINAL_API_URL = API_URL;
+
+
+// ========================================================================
+// BLOCK 0130: Multi Subject 상태 관리
+// ========================================================================
+
+// 로그인 사용자 정보
+var currentUser =
+    JSON.parse(
+        localStorage.getItem('currentUser') || '{}'
+    );
+
+
+// 현재 선택 과목
+var currentSubject =
+    localStorage.getItem('currentSubject') || 'SAT';
+
+
+// 현재 과목 설정
+var subjectConfig = null;
+
+
+// 로그인 회원 구매 가능 과목 목록
+var availableSubjects = [];
+
+
+
+// ========================================================================
+// 기존 Quiz Engine 기본값 유지
+// ========================================================================
+
+// 기본 Sheet
 var DATA_SHEET = 'sat';
-var CURRENT_SUBJECT = ''; // sat 시트 SUBJECT가 비어 있어 필터하지 않음
+
+
+// 기존 SAT API 필터 유지
+var CURRENT_SUBJECT = '';
+
+
+// 저장 Key
 var STORAGE_KEY = 'quiz_progress_main_v8_0B';
+
+
+// 문제 수 Cache
 var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0B_sat';
+
+
+// 언어 저장
 var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
+
+
+// Mode 저장
 var MODE_STORAGE_KEY = 'quiz_mode_v8_0B';
-var SUPPORTED_MODES = ['learn', 'study', 'exam'];
-var currentMode = (localStorage.getItem(MODE_STORAGE_KEY) || 'study').toLowerCase();
-if (SUPPORTED_MODES.indexOf(currentMode) < 0) currentMode = 'study';
+
+
+// 지원 모드
+var SUPPORTED_MODES = [
+    'learn',
+    'study',
+    'exam'
+];
+
+
+
+var currentMode =
+    (
+        localStorage.getItem(
+            MODE_STORAGE_KEY
+        )
+        ||
+        'study'
+    )
+    .toLowerCase();
+
+
+
+if(
+    SUPPORTED_MODES.indexOf(currentMode)
+    < 0
+){
+
+    currentMode = 'study';
+
+}
+
+
+
 var learnRevealed = {};
+
 var examFinished = false;
 
-var SUPPORTED_LANGUAGES = ['EN', 'KO'];
-var currentLanguage = (localStorage.getItem(LANGUAGE_STORAGE_KEY) || 'EN').toUpperCase();
-if (SUPPORTED_LANGUAGES.indexOf(currentLanguage) < 0) currentLanguage = 'EN';
+
+
+// ========================================================================
+// Language
+// ========================================================================
+
+var SUPPORTED_LANGUAGES = [
+    'EN',
+    'KO'
+];
+
+
+var currentLanguage =
+    (
+        localStorage.getItem(
+            LANGUAGE_STORAGE_KEY
+        )
+        ||
+        'EN'
+    )
+    .toUpperCase();
+
+
+
+if(
+    SUPPORTED_LANGUAGES.indexOf(currentLanguage)
+    < 0
+){
+
+    currentLanguage = 'EN';
+
+}
+
+
+
+// ========================================================================
+// Quiz Data State
+// ========================================================================
+
 var QUESTIONS_PER_SET = 120;
+
 var TOTAL_QUESTIONS = 0;
+
 var masterQuestions = [];
+
 var currentQuestions = [];
+
 var userAnswers = [];
+
 var currentIndex = 0;
+
 var correctCount = 0;
+
 var isReviewMode = false;
+
 var originalQuestions = [];
+
 var currentStartNumber = 1;
+
 var autoSaveInterval = null;
+
 var chartInstances = {};
+
 var DOM = {};
 
 // ======================================================================
