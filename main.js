@@ -32,65 +32,137 @@ const LOG = {
 };
 
 // ========================================================================
-// BLOCK 0110: LANG 객체 (원본 B001 완전 유지)
+// BLOCK 0110: Global State + DOM Reference
 // ========================================================================
-var LANG = {
-  enterNumber: "Enter Starting Number",
-  enterSub: "Enter the question number to begin",
-  rangeInfo: "Range: 1 ~ ",
-  startBtn: "▶ START",
-  freshHint: "Enter a number and click START to begin a new session or click Resume above to continue where you left off",
-  resumeTitle: "Resume from where you left off",
-  resumeDetail: "{answered}/{total} answered · {time}",
-  resumeHint: "Click to continue your previous session",
-  qPrefix: "Question",
-  of: "/",
-  originalPrefix: "(Original #",
-  originalSuffix: ")",
-  prevBtn: "◀ PREV",
-  skipBtn: "SKIP",
-  nextBtn: "NEXT ▶",
-  submitBtn: "SUBMIT",
-  quitBtn: "✕ QUIT",
-  reviewModePrefix: "Review Mode: ",
-  reviewModeSuffix: " questions (Wrong/Skipped/Unanswered)",
-  exitReview: "EXIT REVIEW",
-  resultTitle: "📊 RESULT",
-  correctLabel: "✅ CORRECT",
-  accuracyLabel: "🎯 ACCURACY",
-  resultClickLabel: "Results (Click to move)",
-  retryBtn: "🔄 RETRY",
-  reviewBtn: "📝 REVIEW",
-  closeBtn: "✕ CLOSE",
-  reviewModalTitle: "📝 REVIEW",
-  reviewModalSubtitle: "Wrong / Skipped / Unanswered",
-  retryWrongOnlyBtn: "🔄 RETRY WRONG ONLY",
-  reviewQuestions: "Review Questions:",
-  wrongCount: "Wrong:",
-  skippedCount: "Skipped:",
-  unansweredCount: "Unanswered:",
-  questionPrefix: "Question",
-  originalPrefixShort: "(Original #)",
-  statusWrong: "WRONG",
-  statusSkipped: "SKIPPED",
-  statusUnanswered: "UNANSWERED",
-  statusNotAnswered: "Status: You did not answer this question.",
-  correctAnswerLabel: "Correct Answer:",
-  explanationLabel: "Explanation",
-  yourAnswerLabel: "(YOUR ANSWER)",
-  correctAnswer: "✅ CORRECT! Answer:",
-  wrongAnswer: "❌ WRONG. Answer:",
-  noExplanation: "No explanation available.",
-  loadError: "Failed to load questions:",
-  allCorrect: "🎉 Congratulations! All correct!",
-  perfectReview: "✨ Perfect! No questions to review!",
-  confirmExit: "Return to main menu. Progress will not be saved.",
-  reviewModeQuestionPrefix: "Review Question",
-  loading: "Loading...",
-  loadingQuestions: "Loading questions from ",
-  rangeText: "Range: 1 ~ "
-};
 
+
+// ========================================================================
+// DOM Reference
+// ========================================================================
+
+var DOM = {};
+
+
+
+// ========================================================================
+// Quiz State
+// ========================================================================
+
+var currentQuestions = [];
+
+var masterQuestions = [];
+
+var originalQuestions = [];
+
+var userAnswers = [];
+
+var currentIndex = 0;
+
+var correctCount = 0;
+
+
+
+// ========================================================================
+// Subject State
+// ========================================================================
+
+var currentSubject =
+    localStorage.getItem('currentSubject')
+    ||
+    'SAT';
+
+
+var subjectConfig = null;
+
+
+var availableSubjects = [];
+
+
+
+// ========================================================================
+// User State
+// ========================================================================
+
+var currentUser =
+    JSON.parse(
+        localStorage.getItem('currentUser')
+        ||
+        'null'
+    )
+    ||
+    {};
+
+
+
+// ========================================================================
+// Quiz Config
+// ========================================================================
+
+var QUESTIONS_PER_SET = 120;
+
+var TOTAL_QUESTIONS = 0;
+
+var DATA_SHEET = 'sat';
+
+var CURRENT_SUBJECT = '';
+
+
+
+// ========================================================================
+// Storage
+// ========================================================================
+
+var STORAGE_KEY =
+    'quiz_progress_main_v8_0B';
+
+
+var TOTAL_CACHE_KEY =
+    'quiz_total_questions_v8_0B_sat';
+
+
+
+// ========================================================================
+// Mode / Language
+// ========================================================================
+
+var LANGUAGE_STORAGE_KEY =
+    'quiz_language_v7';
+
+
+var MODE_STORAGE_KEY =
+    'quiz_mode_v8_0B';
+
+
+var currentLanguage =
+    localStorage.getItem(
+        LANGUAGE_STORAGE_KEY
+    )
+    ||
+    'EN';
+
+
+var currentMode =
+    localStorage.getItem(
+        MODE_STORAGE_KEY
+    )
+    ||
+    'study';
+
+
+
+// ========================================================================
+// Renderer / Timer State
+// ========================================================================
+
+var chartInstances = {};
+
+var autoSaveInterval = null;
+
+var isReviewMode = false;
+
+var examFinished = false;
+
+var learnRevealed = {};
 // ========================================================================
 // BLOCK 0120: 시스템 상수 + Multi Subject State
 // ========================================================================
