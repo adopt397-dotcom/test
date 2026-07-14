@@ -5220,7 +5220,7 @@ async function startQuizWithNumber(uiStartNumber) {
 }
 
 // ========================================================================
-// BLOCK 1510: 시스템 초기화 (Multi Subject 연결)
+// BLOCK 1510: 시스템 초기화 (Multi Subject 연결 수정)
 // ========================================================================
 
 function initialize() {
@@ -5229,6 +5229,26 @@ function initialize() {
   console.log(
     '🔧 initialize() started'
   );
+
+
+
+  // =====================================================
+  // DOM 먼저 초기화
+  // =====================================================
+
+  initDOM();
+
+
+  initLanguageSelector();
+
+
+  initModeSelector();
+
+
+  initTimer();
+
+
+  attachEvents();
 
 
 
@@ -5247,7 +5267,6 @@ function initialize() {
     currentUser = {};
 
   }
-
 
 
   console.log(
@@ -5276,7 +5295,7 @@ function initialize() {
       ){
 
 
-        let savedSubject =
+        var savedSubject =
           localStorage.getItem(
             'currentSubject'
           )
@@ -5318,20 +5337,8 @@ function initialize() {
 
 
     // =====================================================
-    // Existing Initialize Flow
+    // Existing Quiz Initialize Flow
     // =====================================================
-
-
-    initDOM();
-
-    initLanguageSelector();
-
-    initModeSelector();
-
-    initTimer();
-
-    attachEvents();
-
 
 
     updateSplash(
@@ -5385,28 +5392,40 @@ function initialize() {
 
 
 
-      if(DOM.maxNumberSpan)
-        DOM.maxNumberSpan.style.display = 'none';
+      if(DOM.maxNumberSpan){
+
+        DOM.maxNumberSpan.style.display =
+          'none';
+
+      }
 
 
 
-      if(DOM.maxNumberDisplay)
-        DOM.maxNumberDisplay.style.display = 'none';
+      if(DOM.maxNumberDisplay){
+
+        DOM.maxNumberDisplay.style.display =
+          'none';
+
+      }
 
 
 
-      DOM.startNumberInput.placeholder =
-        '1-' + TOTAL_QUESTIONS;
+      if(DOM.startNumberInput){
 
 
-
-      DOM.startNumberInput.max =
-        TOTAL_QUESTIONS;
-
+        DOM.startNumberInput.placeholder =
+          '1-' + TOTAL_QUESTIONS;
 
 
-      DOM.startNumberInput.min =
-        1;
+        DOM.startNumberInput.max =
+          TOTAL_QUESTIONS;
+
+
+        DOM.startNumberInput.min =
+          1;
+
+
+      }
 
 
 
