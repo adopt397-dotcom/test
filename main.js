@@ -105,10 +105,6 @@ var ORIGINAL_API_URL = API_URL;
 // ========================================================================
 
 // 로그인 사용자 정보
-var currentUser =
-    JSON.parse(
-        localStorage.getItem('currentUser') || '{}'
-    );
 
 
 // 현재 선택 과목
