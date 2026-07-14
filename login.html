@@ -352,9 +352,9 @@
                 });
                 const data = await response.json();
                 // ========================================================================
-// LOGIN SUCCESS BLOCK
-// if (data.success) 전체 교체
+// LOGIN RESULT BLOCK
 // ========================================================================
+
 
 if (data.success) {
 
@@ -411,11 +411,68 @@ if (data.success) {
     );
 
 
+
 }
-            } catch (err) {
-                showResult('loginResult', '❌ Server error: ' + err.message, false);
-            }
-        });
+else {
+
+
+    let msg =
+        data.message;
+
+
+
+    if(
+        data.status === 'pending'
+    ){
+
+        msg =
+            '⏳ ' + msg;
+
+    }
+    else if(
+        data.status === 'expired'
+    ){
+
+        msg =
+            '⏰ ' + msg;
+
+    }
+    else if(
+        data.status === 'none'
+    ){
+
+        msg =
+            '💳 ' + msg;
+
+    }
+
+
+
+    showResult(
+        'loginResult',
+        '❌ ' + msg,
+        false
+    );
+
+
+}
+
+
+
+} catch (err) {
+
+
+    showResult(
+        'loginResult',
+        '❌ Server error: ' + err.message,
+        false
+    );
+
+
+}
+
+
+});
 
         // ==============================
         // 회원가입 (방법 5 적용)
