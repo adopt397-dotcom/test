@@ -163,6 +163,34 @@ var isReviewMode = false;
 var examFinished = false;
 
 var learnRevealed = {};
+
+// ========================================================================
+// Language Text Object
+// ========================================================================
+
+var LANG = {
+
+    qPrefix: 'Question',
+    of: 'of',
+    originalPrefix: ' (Original #',
+    originalSuffix: ')',
+
+    correct: 'Correct',
+    incorrect: 'Incorrect',
+    explanation: 'Explanation',
+
+    next: 'Next',
+    previous: 'Previous',
+    submit: 'Submit',
+
+    loading: 'Loading...',
+    ready: 'Ready'
+
+};
+
+
+
+
 // ========================================================================
 // BLOCK 0120: 시스템 상수 + Multi Subject State
 // ========================================================================
