@@ -351,9 +351,68 @@
                     body: JSON.stringify({ action: 'login', email, pin: password })
                 });
                 const data = await response.json();
-                if (data.success) {
-                    showResult('loginResult', '✅ Welcome, ' + data.name + '!', true);
-                    window.location.href = './index.html';
+              // ========================================================================
+// LOGIN SUCCESS BLOCK
+// 로그인 성공 처리
+// ========================================================================
+
+if (data.success) {
+
+
+    const currentUser = {
+
+
+        name:
+            data.name || '',
+
+
+        expired_date:
+            data.expired_date || '',
+
+
+        access_subjects:
+            data.access_subjects || []
+
+
+    };
+
+
+
+    localStorage.setItem(
+        'currentUser',
+        JSON.stringify(currentUser)
+    );
+
+
+
+    console.log(
+        '✅ Current User Saved:',
+        currentUser
+    );
+
+
+
+    showResult(
+        'loginResult',
+        '✅ Welcome, ' + data.name + '!',
+        true
+    );
+
+
+
+    setTimeout(
+        function(){
+
+            window.location.href =
+                './index.html';
+
+        },
+        1000
+    );
+
+
+
+}
                 } else {
                     let msg = data.message;
                     if (data.status === 'pending') msg = '⏳ ' + msg;
