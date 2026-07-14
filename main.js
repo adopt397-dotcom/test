@@ -1116,44 +1116,186 @@ function renderLearnPanel(q, displayAnswer) {
   // 중복되는 Correct Answer 안내 박스를 출력하지 않는다.
   return '';
 }
-// ======================================================================
-// BLOCK 0690: SUBJECT MANAGER
-// ======================================================================
+// ========================================================================
+// BLOCK 0690: Multi Subject Loader + Subject Config Apply
+// ========================================================================
 
-function setCurrentSubject(config) {
 
-    if (!config) {
-        return false;
+// ========================================================================
+// Load Available Subjects
+// ========================================================================
+
+async function loadSubjects() {
+
+
+    try {
+
+
+        const response =
+            await fetch(
+                ORIGINAL_API_URL +
+                '?action=subjects&_=' +
+                Date.now()
+            );
+
+
+        const data =
+            await response.json();
+
+
+
+        if(
+            Array.isArray(data)
+        ){
+
+            availableSubjects = data;
+
+        }
+        else if(
+            data.data &&
+            Array.isArray(data.data)
+        ){
+
+            availableSubjects = data.data;
+
+        }
+        else {
+
+            availableSubjects = [];
+
+        }
+
+
+
+        console.log(
+            '✅ Subjects Loaded:',
+            availableSubjects
+        );
+
+
+
+        const purchased =
+            currentUser.access_subjects || [];
+
+
+
+        availableSubjects =
+            availableSubjects.filter(
+                function(subject){
+
+                    return purchased.includes(
+                        subject.CODE
+                    );
+
+                }
+            );
+
+
+
+        console.log(
+            '✅ Purchased Subjects:',
+            availableSubjects
+        );
+
+
+
+        return availableSubjects;
+
+
     }
+    catch(error){
+
+
+        console.error(
+            '❌ Subject Load Failed:',
+            error
+        );
+
+
+        availableSubjects = [];
+
+
+        return [];
+
+    }
+
+
+}
+
+
+
+
+
+// ========================================================================
+// Apply Selected Subject Configuration
+// ========================================================================
+
+function applySubjectConfig(code) {
+
+
+    const config =
+        availableSubjects.find(
+            function(subject){
+
+                return (
+                    String(subject.CODE)
+                    .toUpperCase()
+                    ===
+                    String(code)
+                    .toUpperCase()
+                );
+
+            }
+        );
+
+
+
+    if(!config){
+
+
+        console.warn(
+            '⚠️ Subject config not found:',
+            code
+        );
+
+
+        return false;
+
+    }
+
+
 
 
     subjectConfig = config;
 
 
-    currentSubject = config.CODE;
+
+    localStorage.setItem(
+        'currentSubject',
+        config.CODE
+    );
 
 
-    if (config.SHEET) {
 
-        DATA_SHEET = config.SHEET;
-
-    }
+    DATA_SHEET =
+        config.SHEET;
 
 
-    if (config.SET_SIZE) {
 
-        QUESTIONS_PER_SET =
-            Number(config.SET_SIZE);
+    QUESTIONS_PER_SET =
+        Number(
+            config.SET_SIZE
+        )
+        ||
+        120;
 
-    }
 
 
     console.log(
-        "📚 Current Subject:",
-        currentSubject,
-        DATA_SHEET,
-        QUESTIONS_PER_SET
+        '✅ Subject Applied:',
+        subjectConfig
     );
+
 
 
     return true;
