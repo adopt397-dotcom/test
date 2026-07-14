@@ -1,0 +1,264 @@
+// ======================================================================
+// GAS: 전체 코드 (payment_status 처리 포함)
+// ======================================================================
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action || 'login';
+    
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('member');
+    if (!sheet) {
+      return createResponse(false, 'Sheet not found');
+    }
+    
+    const rows = sheet.getDataRange().getValues();
+    if (rows.length < 2) {
+      return createResponse(false, 'No data found');
+    }
+    
+    const headers = rows[0].map(h => String(h || '').trim().toLowerCase());
+    const emailCol = headers.indexOf('email');
+    const pinCol = headers.indexOf('pin');
+    const nameCol = headers.indexOf('name');
+    const pnCol = headers.indexOf('pn');
+    const statusCol = headers.indexOf('payment_status');
+    
+    if (emailCol === -1 || pinCol === -1 || nameCol === -1 || pnCol === -1 || statusCol === -1) {
+      return createResponse(false, 'Required columns (email, pin, name, pn, payment_status) not found. Headers: ' + headers.join(', '));
+    }
+    
+    let response;
+    
+    switch(action) {
+      case 'login':
+        response = handleLogin(rows, emailCol, pinCol, statusCol, nameCol, data);
+        break;
+      case 'signup':
+        response = handleSignup(sheet, rows, emailCol, pinCol, nameCol, pnCol, statusCol, data);
+        break;
+      case 'changePin':
+        response = handleChangePin(sheet, rows, emailCol, pinCol, statusCol, data);
+        break;
+      case 'changePassword':
+        response = handleChangePassword(sheet, rows, emailCol, pinCol, statusCol, data);
+        break;
+      default:
+        response = createResponse(false, 'Unknown action: ' + action);
+    }
+    
+    return ContentService
+      .createTextOutput(JSON.stringify(response))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch(e) {
+    return createResponse(false, 'Server error: ' + e.message);
+  }
+}
+
+function createResponse(success, message, extraData = {}) {
+  return { success, message, ...extraData };
+}
+
+function findUserByEmail(rows, emailCol, email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  for (let i = 1; i < rows.length; i++) {
+    const rowEmail = String(rows[i][emailCol] || '').trim().toLowerCase();
+    if (rowEmail === normalizedEmail) {
+      return { index: i, row: rows[i] };
+    }
+  }
+  return null;
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+}
+
+function isValidPhone(pn) {
+  return /^[0-9]{10,11}$/.test(String(pn || '').trim());
+}
+
+function logDebug(action, data) {
+  const logData = { action, email: data.email || '' };
+  Logger.log(JSON.stringify(logData));
+}
+
+function handleLogin(rows, emailCol, pinCol, statusCol, nameCol, data) {
+  const email = String(data.email || '').trim();
+  const pin = String(data.pin || '').trim();
+  
+  if (!isValidEmail(email)) {
+    return createResponse(false, 'Invalid email format.');
+  }
+  
+  const user = findUserByEmail(rows, emailCol, email);
+  if (!user) {
+    return createResponse(false, 'Email or PIN incorrect.');
+  }
+  
+  const row = user.row;
+  const rowPin = String(row[pinCol] || '').trim();
+  if (rowPin !== pin) {
+    return createResponse(false, 'Email or PIN incorrect.');
+  }
+  
+  const status = String(row[statusCol] || '').trim().toLowerCase();
+  
+  // 🔥 상태별 처리
+  if (status === 'a') {
+    return createResponse(true, 'Login successful', { 
+      name: row[nameCol] || '',
+      status: 'active'
+    });
+  } else if (status === 'p') {
+    return createResponse(false, 'Account pending approval. Please wait for admin confirmation.', { status: 'pending' });
+  } else if (status === 'e') {
+    return createResponse(false, 'Your subscription has expired. Please renew.', { status: 'expired' });
+  } else if (status === 'n') {
+    return createResponse(false, 'No active subscription. Please purchase a plan.', { status: 'none' });
+  } else {
+    return createResponse(false, 'Account status unknown. Contact support.', { status: 'unknown' });
+  }
+}
+
+function handleSignup(sheet, rows, emailCol, pinCol, nameCol, pnCol, statusCol, data) {
+  const email = String(data.email || '').trim();
+  const pin = String(data.pin || '').trim();
+  const name = String(data.name || '').trim();
+  const pn = String(data.pn || '').trim();
+  
+  if (!isValidEmail(email)) {
+    return createResponse(false, 'Invalid email format.');
+  }
+  if (pin.length < 4) {
+    return createResponse(false, 'PIN must be at least 4 characters.');
+  }
+  if (name === '') {
+    return createResponse(false, 'Name is required.');
+  }
+  if (!isValidPhone(pn)) {
+    return createResponse(false, 'Valid phone number is required (10-11 digits).');
+  }
+  
+  const existing = findUserByEmail(rows, emailCol, email);
+  if (existing) {
+    return createResponse(false, 'Email already registered.');
+  }
+  
+  let maxId = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const id = parseInt(rows[i][0]) || 0;
+    if (id > maxId) maxId = id;
+  }
+  
+  const headerCount = rows[0].length;
+  const newRow = new Array(headerCount).fill('');
+  newRow[0] = maxId + 1;
+  newRow[emailCol] = email;
+  newRow[pinCol] = pin;
+  newRow[nameCol] = name;
+  newRow[pnCol] = pn;
+  newRow[statusCol] = 'p';
+  
+  sheet.appendRow(newRow);
+  return createResponse(true, 'Signup complete. Awaiting admin approval.');
+}
+
+function handleChangePin(sheet, rows, emailCol, pinCol, statusCol, data) {
+  logDebug('changePin', data);
+  
+  const email = String(data.email || '').trim();
+  const oldPin = String(data.oldPin || '').trim();
+  const newPin = String(data.newPin || '').trim();
+  
+  if (!isValidEmail(email)) {
+    return createResponse(false, 'Invalid email format.');
+  }
+  if (newPin.length < 4) {
+    return createResponse(false, 'New PIN must be at least 4 characters.');
+  }
+  
+  const user = findUserByEmail(rows, emailCol, email);
+  if (!user) {
+    return createResponse(false, 'User not found.');
+  }
+  
+  const row = user.row;
+  const currentPin = String(row[pinCol] || '').trim();
+  if (currentPin !== oldPin) {
+    return createResponse(false, 'Current PIN incorrect.');
+  }
+  
+  const status = String(row[statusCol] || '').trim().toLowerCase();
+  if (status !== 'a') {
+    return createResponse(false, 'Account not approved.');
+  }
+  
+  sheet.getRange(user.index + 1, pinCol + 1).setValue(newPin);
+  return createResponse(true, 'PIN changed successfully.');
+}
+
+function handleChangePassword(sheet, rows, emailCol, pinCol, statusCol, data) {
+  logDebug('changePassword', data);
+  
+  const email = String(data.email || '').trim();
+  const oldPassword = String(data.oldPassword || '').trim();
+  const newPassword = String(data.newPassword || '').trim();
+  
+  if (!isValidEmail(email)) {
+    return createResponse(false, 'Invalid email format.');
+  }
+  if (newPassword.length < 4) {
+    return createResponse(false, 'New password must be at least 4 characters.');
+  }
+  
+  const user = findUserByEmail(rows, emailCol, email);
+  if (!user) {
+    return createResponse(false, 'User not found.');
+  }
+  
+  const row = user.row;
+  const currentPin = String(row[pinCol] || '').trim();
+  if (currentPin !== oldPassword) {
+    return createResponse(false, 'Current password incorrect.');
+  }
+  
+  const status = String(row[statusCol] || '').trim().toLowerCase();
+  if (status !== 'a') {
+    return createResponse(false, 'Account not approved.');
+  }
+  
+  sheet.getRange(user.index + 1, pinCol + 1).setValue(newPassword);
+  return createResponse(true, 'Password changed successfully.');
+}
+
+function doGet() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('member');
+    
+    if (!sheet) {
+      return ContentService.createTextOutput('ERROR: "member" sheet not found!');
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    const rowCount = data.length;
+    const headers = data[0] || [];
+    
+    let result = '✅ Sheet found!\n';
+    result += '📊 Total rows: ' + rowCount + '\n';
+    result += '📋 Headers: ' + headers.join(', ') + '\n\n';
+    result += '📝 First 3 rows:\n';
+    
+    for (let i = 0; i < Math.min(rowCount, 4); i++) {
+      result += 'Row ' + i + ': ' + data[i].join(' | ') + '\n';
+    }
+    
+    return ContentService.createTextOutput(result);
+    
+  } catch(e) {
+    return ContentService.createTextOutput('ERROR: ' + e.message);
+  }
+}
