@@ -367,9 +367,9 @@
                 if (data.success) {
                     const user = data.user || { name: data.name || '', email };
                     const subjects = Array.isArray(data.subjects) ? data.subjects : [];
-                    localStorage.removeItem('quiz_test_current_subject_v1');
-                    localStorage.setItem('quiz_test_current_user_v1', JSON.stringify(user));
-                    localStorage.setItem('quiz_test_available_subjects_v1', JSON.stringify(subjects));
+                    localStorage.removeItem('quiz_current_subject_v1');
+                    localStorage.setItem('quiz_current_user_v1', JSON.stringify(user));
+                    localStorage.setItem('quiz_available_subjects_v1', JSON.stringify(subjects));
                     showResult('loginResult', '✅ Welcome, ' + (user.name || email) + '!', true);
                     renderSubjectPicker(subjects);
                 } else {
@@ -403,7 +403,7 @@
                 meta.textContent = (subject.CATEGORY || 'QUIZ') + ' · ' + Number(subject.SET_SIZE || 120) + ' questions per set';
                 button.appendChild(meta);
                 button.addEventListener('click', () => {
-                    localStorage.setItem('quiz_test_current_subject_v1', JSON.stringify(subject));
+                    localStorage.setItem('quiz_current_subject_v1', JSON.stringify(subject));
                     window.location.href = './index.html';
                 });
                 list.appendChild(button);

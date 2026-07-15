@@ -105,10 +105,10 @@ var subjectConfig = null;
 var availableSubjects = [];
 var DATA_SHEET = 'sat';
 var CURRENT_SUBJECT = '';
-var STORAGE_KEY = 'quiz_test_progress_main_v8_0C_sat';
-var TOTAL_CACHE_KEY = 'quiz_test_total_questions_v8_0C_sat';
-var LANGUAGE_STORAGE_KEY = 'quiz_test_language_v7';
-var MODE_STORAGE_KEY = 'quiz_test_mode_v8_0B';
+var STORAGE_KEY = 'quiz_progress_main_v8_0C_sat';
+var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0C_sat';
+var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
+var MODE_STORAGE_KEY = 'quiz_mode_v8_0B';
 var SUPPORTED_MODES = ['learn', 'study', 'exam'];
 var currentMode = (localStorage.getItem(MODE_STORAGE_KEY) || 'study').toLowerCase();
 if (SUPPORTED_MODES.indexOf(currentMode) < 0) currentMode = 'study';
@@ -135,9 +135,9 @@ var DOM = {};
 // BLOCK 3000: Subject Management
 function applySubjectConfig() {
   try {
-    currentUser = JSON.parse(localStorage.getItem('quiz_test_current_user_v1') || 'null');
-    availableSubjects = JSON.parse(localStorage.getItem('quiz_test_available_subjects_v1') || '[]');
-    subjectConfig = JSON.parse(localStorage.getItem('quiz_test_current_subject_v1') || 'null');
+    currentUser = JSON.parse(localStorage.getItem('quiz_current_user_v1') || 'null');
+    availableSubjects = JSON.parse(localStorage.getItem('quiz_available_subjects_v1') || '[]');
+    subjectConfig = JSON.parse(localStorage.getItem('quiz_current_subject_v1') || 'null');
   } catch (e) {
     currentUser = null;
     availableSubjects = [];
@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C11-FINAL6-TEST1');
+      window.location.replace('./login.html?v=8.0C10');
       return false;
     }
   }
@@ -169,8 +169,8 @@ function applySubjectConfig() {
   QUESTIONS_PER_SET = Math.max(1, parseInt(subjectConfig.SET_SIZE, 10) || 120);
   TOTAL_QUESTIONS = Math.max(0, parseInt(subjectConfig.QUESTION_COUNT, 10) || 0);
   var keyPart = currentSubject.replace(/[^A-Z0-9_-]/g, '_');
-  STORAGE_KEY = 'quiz_test_progress_main_v8_0C_' + keyPart;
-  TOTAL_CACHE_KEY = 'quiz_test_total_questions_v8_0C_' + keyPart;
+  STORAGE_KEY = 'quiz_progress_main_v8_0C_' + keyPart;
+  TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0C_' + keyPart;
   window.currentUser = currentUser;
   window.currentSubject = currentSubject;
   window.subjectConfig = subjectConfig;
