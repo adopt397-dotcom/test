@@ -1361,7 +1361,7 @@
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0C';
+import { initialize } from './main.js?v=8.0C11';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
@@ -1424,12 +1424,12 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <!-- ============================================================ -->
-<!-- BLOCK 08: SAT Chatbot (Full English, Enter Key, Auto-detect) -->
+<!-- BLOCK 08: AI Tutor (Full English, Enter Key, Auto-detect) -->
 <!-- ============================================================ -->
 <div id="satTutorPanel" class="sat-tutor-panel">
   <div class="sat-tutor-heading">
     <div>
-      <h3>💬 SAT Tutor AI</h3>
+      <h3>💬 AI TUTOR</h3>
       <div class="sat-tutor-subtitle">Ask about the current question · mode-aware tutor</div>
     </div>
     <div class="sat-tutor-badge">Integrated Tutor</div>
@@ -1462,7 +1462,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script>
   // ============================================================
-  // SAT Chatbot - sendChatbotMessage()
+  // AI Tutor - sendChatbotMessage()
   // ============================================================
   const SAT_BOT_API_URL =
     'https://sat-bot-07020143.vercel.app/api/chat';
@@ -1477,15 +1477,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || 'SAT Tutor API unavailable');
+        throw new Error(data.error || 'AI Tutor API unavailable');
       }
 
-      console.log('✅ SAT Tutor API ready:', data);
+      console.log('✅ AI Tutor API ready:', data);
     } catch (error) {
-      console.warn('⚠️ SAT Tutor API status check failed:', error);
+      console.warn('⚠️ AI Tutor API status check failed:', error);
       if (responseBox && !responseBox.textContent.trim()) {
         responseBox.innerHTML =
-          '⚠️ SAT Tutor is temporarily unavailable.<br>' +
+          '⚠️ AI Tutor is temporarily unavailable.<br>' +
           '<small>Please check the Vercel deployment and environment variables.</small>';
       }
     }

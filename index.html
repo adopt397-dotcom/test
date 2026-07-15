@@ -1,10 +1,11 @@
 <!-- ============================================================ -->
 <!-- BLOCK 01: 외부 라이브러리 (CDN) -->
 <!-- ============================================================ -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
-</script>
-<script src="https://cdn.jsdelivr.net/npm/mathjs@14.3.0/lib/browser/math.js">
-</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/mathjs@14.3.0/lib/browser/math.js"></script>
+
+
 
 <!-- ============================================================ -->
 <!-- BLOCK 02: 타이머 UI -->
@@ -22,7 +23,7 @@
 <!-- BLOCK 03: 스플래시 오버레이 (로딩 화면) -->
 <!-- ============================================================ -->
 <div id="splashOverlay">
-  <div class="icon">📚</div>=
+  <div class="icon">📚</div>
   <div class="title">gongboo<span>.org</span></div>
   <div class="subtitle">QUIZ</div>
   <div class="bar-track"><div class="bar-fill" id="splashBar"></div></div>
@@ -40,10 +41,28 @@
   <div class="quiz-header">
     <div class="sat-logo">
       <span class="sat-icon">📝</span>
-      <span class="sat-title">Digital SAT</span>
+      <span class="sat-title">Digital SAT <span class="set-separator">·</span> Set <span id="currentSetTitle">1</span></span>
       <span class="sat-badge">Practice</span>
     </div>
     <div class="sat-sub">Reading &amp; Writing · Math</div>
+    <div class="language-switcher" aria-label="Language selector">
+      <label for="languageSelector">Language</label>
+      <select id="languageSelector">
+        <option value="EN">English</option>
+        <option value="KO">한국어</option>
+      </select>
+    </div>
+
+    <div class="learning-mode-panel" aria-label="Learning mode preview">
+      <div id="modeButtons" class="mode-buttons">
+        <button type="button" class="mode-btn mode-learn" data-ui-mode="learn">🟢 Learn</button>
+        <button type="button" class="mode-btn mode-study active" data-ui-mode="study">🔵 Study</button>
+        <button type="button" class="mode-btn mode-exam" data-ui-mode="exam">🔴 Exam</button>
+      </div>
+      <div id="modeDescription" class="mode-description">
+        🔵 Study · Choose a mode before or during the set.
+      </div>
+    </div>
   </div>
 
    <!-- ===== BLOCK 04-2: 설정 영역 (시작/재개) ===== -->
@@ -243,6 +262,26 @@
     position: relative;
     z-index: 1
   }
+  .language-switcher {
+    margin-top: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    z-index: 2;
+    font-size: .75rem;
+  }
+  .language-switcher label { opacity: .75; }
+  .language-switcher select {
+    padding: 7px 28px 7px 12px;
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 18px;
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .language-switcher select option { color: #111; background: #fff; }
 
   /* ===== 설정 영역 ===== */
   .setup-area {
@@ -1075,40 +1114,324 @@
   }
 
 /* ===== 공통 ===== */
-
-* {
+ * {
   user-select: none !important;
 }
 ::selection {
   background: transparent !important;
 }
 
+  /* v7.1.1 bilingual display */
+  .bilingual-block{display:flex;flex-direction:column;gap:10px}
+  .language-line-en{color:#172033}
+  .language-line-ko{color:#27364d;padding-top:10px;margin-top:2px;border-top:1px dashed #cfd7e3;font-family:'Malgun Gothic','Noto Sans KR',sans-serif}
+  .question-text.bilingual-block{margin-top:18px}
+  .question-text .language-line-en,.question-text .language-line-ko{font-size:17px;line-height:1.75;font-weight:600}
+  .passage-language-card{background:#f8f9fa;padding:16px;border-radius:10px;margin:14px 0;border:1px solid #dee2e6}
+  .passage-language-content .language-line-en,.passage-language-content .language-line-ko{white-space:pre-wrap;font-size:15px;line-height:1.75}
+  .choice-language-content{flex:1;min-width:0}
+  .choice-language-content .language-line-en{font-size:15px;line-height:1.5}
+  .choice-language-content .language-line-ko{font-size:14px;line-height:1.55;color:#56657a}
+  .explanation-language-content{margin-top:14px}
+  .explanation-language-content .language-line-en,.explanation-language-content .language-line-ko{font-size:15px;line-height:1.7}
+
+
+  /* ============================================================
+     SAT v8.0B — MODES
+     Stable quiz behavior remains unchanged.
+     ============================================================ */
+  .set-separator {
+    color:#f5a623;
+    -webkit-text-fill-color:#f5a623;
+  }
+
+  .learning-mode-panel {
+    max-width:620px;
+    margin:14px auto 0;
+    position:relative;
+    z-index:2;
+  }
+
+  .mode-buttons {
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    padding:6px;
+    border-radius:16px;
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.14);
+  }
+
+  .mode-btn {
+    border:1px solid transparent;
+    border-radius:12px;
+    padding:10px 8px;
+    font-size:14px;
+    font-weight:800;
+    color:#fff;
+    cursor:pointer;
+    background:rgba(255,255,255,.08);
+    transition:transform .18s ease, background .18s ease, box-shadow .18s ease;
+  }
+
+  .mode-btn:hover {
+    transform:translateY(-1px);
+    background:rgba(255,255,255,.15);
+  }
+
+  .mode-btn.active {
+    background:#fff;
+    color:#172033;
+    box-shadow:0 5px 18px rgba(0,0,0,.22);
+  }
+
+  .mode-description {
+    padding-top:8px;
+    color:rgba(255,255,255,.78);
+    font-size:12px;
+    line-height:1.4;
+  }
+
+  .sat-tutor-panel {
+    width:min(900px, calc(100% - 24px));
+    margin:-2px auto 22px;
+    padding:20px;
+    background:#fff;
+    border:1px solid #e1e6ec;
+    border-top:3px solid #f5a623;
+    border-radius:0 0 16px 16px;
+    box-shadow:0 9px 24px rgba(0,0,0,.08);
+  }
+
+  .sat-tutor-heading {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:15px;
+  }
+
+  .sat-tutor-heading h3 {
+    margin:0;
+    color:#1a1a2e;
+    font-size:19px;
+  }
+
+  .sat-tutor-subtitle {
+    margin-top:3px;
+    color:#7b8796;
+    font-size:12px;
+  }
+
+  .sat-tutor-badge {
+    padding:7px 11px;
+    border-radius:20px;
+    background:#fff8eb;
+    color:#b87500;
+    border:1px solid #f5d28b;
+    font-size:12px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+
+  @media (max-width:640px) {
+    .mode-btn {
+      font-size:12px;
+      padding:9px 5px;
+    }
+    .sat-tutor-heading {
+      flex-direction:column;
+    }
+  }
+
+
+  /* SAT v8.0B mode engine */
+  html[data-study-mode="learn"] .quiz-header { border-bottom-color:#27ae60; }
+  html[data-study-mode="study"] .quiz-header { border-bottom-color:#3498db; }
+  html[data-study-mode="exam"] .quiz-header { border-bottom-color:#e74c3c; }
+
+  .choice.selected {
+    border-color:#3498db !important;
+    background:#eaf4fd !important;
+    box-shadow:0 0 0 2px rgba(52,152,219,.12);
+  }
+
+  .learn-panel {
+    margin-top:18px;
+    padding:17px;
+    border-radius:13px;
+    background:#eefaf3;
+    border:1px solid #bfe8cf;
+    text-align:center;
+  }
+
+  .learn-reveal-btn {
+    padding:13px 22px;
+    border:0;
+    border-radius:10px;
+    background:#27ae60;
+    color:#fff;
+    font-size:15px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 5px 16px rgba(39,174,96,.22);
+  }
+
+  .learn-reveal-btn:hover { background:#219150; }
+
+  .learn-panel-note {
+    margin-top:9px;
+    color:#587063;
+    font-size:13px;
+  }
+
+  .learn-correct-answer {
+    display:inline-block;
+    margin-bottom:12px;
+    padding:9px 16px;
+    border-radius:30px;
+    background:#27ae60;
+    color:#fff;
+    font-weight:800;
+  }
+
+  .learn-completion-message {
+    padding:28px;
+    border-radius:14px;
+    background:#eefaf3;
+    border:1px solid #bfe8cf;
+    line-height:1.8;
+    text-align:center;
+  }
+
+
+  /* SAT v8.0B1 interaction fixes */
+  html[data-study-mode="learn"] .choice.learn-choice:not(.disabled) {
+    cursor:pointer;
+    border-color:#c8e8d3;
+    background:#fbfffc;
+  }
+
+  html[data-study-mode="learn"] .choice.learn-choice:not(.disabled):hover {
+    border-color:#27ae60;
+    background:#eefaf3;
+    transform:translateY(-1px);
+  }
+
+  .learn-panel.revealed {
+    border-color:#8dd2a8;
+  }
+
+
+  /* SAT v8.0B2 — Learn auto-answer */
+  html[data-study-mode="learn"] .learn-reveal-btn {
+    display:none !important;
+  }
+
+  html[data-study-mode="learn"] .choice.learn-choice {
+    cursor:default !important;
+  }
+
+  html[data-study-mode="learn"] .choice.learn-choice:hover {
+    transform:none !important;
+  }
+
+  html[data-study-mode="learn"] .learn-panel.revealed {
+    margin-top:18px;
+    background:#eefaf3;
+    border-color:#8dd2a8;
+  }
+
+
+  /* v8.0B3: remove duplicate Learn answer panel */
+  html[data-study-mode="learn"] .learn-panel:empty {
+    display:none !important;
+  }
+
 </style>
 
 <!-- ============================================================ -->
-<!-- BLOCK 07: JavaScript 로드 (sat/main.js) -->
+<!-- BLOCK 07: JavaScript 로드 및 실행 -->
 <!-- ============================================================ -->
 
-<!-- 1. MathJax (수식 렌더링) -->
+<!-- 1. MathJax -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
 
-<!-- 2. main.js (sat 폴더 내부) -->
-<script type="module" src="./main.js"></script>
-
-<!-- 3. 실행 -->
+<!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-  import { initialize } from './main.js';
-  document.addEventListener('DOMContentLoaded', function() {
-    initialize();
-  });
+import { initialize } from './main.js?v=8.0C11';
+
+document.addEventListener('DOMContentLoaded', () => {
+  initialize();
+});
 </script>
 
 
+
+<script>
+(function() {
+  const MODE_TEXT = {
+    learn: '🟢 Learn · Answers and explanations are shown automatically.',
+    study: '🔵 Study · Choose a mode before or during the set.',
+    exam: '🔴 Exam · Feedback stays hidden until you submit the set.'
+  };
+
+  function updateSetTitleFromStart(startNumber) {
+    const title = document.getElementById('currentSetTitle');
+    if (!title) return;
+
+    const start = Math.max(1, Number(startNumber) || 1);
+    title.textContent = String(Math.ceil(start / 120));
+  }
+
+  function bindSetTitleUI() {
+    const setSelector = document.getElementById('setSelector');
+    const startInput = document.getElementById('startNumber');
+    const startButton = document.getElementById('startQuizBtn');
+
+    if (setSelector) {
+      setSelector.addEventListener('change', function() {
+        const setNumber = Math.max(1, Number(this.value) || 1);
+        updateSetTitleFromStart(((setNumber - 1) * 120) + 1);
+      });
+    }
+
+    if (startInput) {
+      startInput.addEventListener('input', function() {
+        updateSetTitleFromStart(this.value);
+      });
+    }
+
+    if (startButton) {
+      startButton.addEventListener('click', function() {
+        updateSetTitleFromStart(startInput ? startInput.value : 1);
+      });
+    }
+
+    updateSetTitleFromStart(startInput ? startInput.value : 1);
+  }
+
+  function bindModePreviewUI() {
+    // v8.0B1: main.js exclusively controls mode state and behavior.
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    bindSetTitleUI();
+  });
+})();
+</script>
+
 <!-- ============================================================ -->
-<!-- BLOCK 08: SAT Chatbot (Full English, Enter Key, Auto-detect) -->
+<!-- BLOCK 08: AI Tutor (Full English, Enter Key, Auto-detect) -->
 <!-- ============================================================ -->
-<div style="max-width:700px;margin:20px auto;padding:20px;background:#fff;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:2px solid #f5a623;">
-  <h3 style="margin-bottom:15px;color:#1a1a2e;">🤖 SAT Chatbot</h3>
+<div id="satTutorPanel" class="sat-tutor-panel">
+  <div class="sat-tutor-heading">
+    <div>
+      <h3>💬 AI TUTOR</h3>
+      <div class="sat-tutor-subtitle">Ask about the current question · mode-aware tutor</div>
+    </div>
+    <div class="sat-tutor-badge">Integrated Tutor</div>
+  </div>
   <div style="display:flex;flex-direction:column;gap:10px;">
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <input 
@@ -1137,8 +1460,35 @@
 
 <script>
   // ============================================================
-  // SAT Chatbot - sendChatbotMessage()
+  // AI Tutor - sendChatbotMessage()
   // ============================================================
+  const SAT_BOT_API_URL =
+    'https://sat-bot-07020143.vercel.app/api/chat';
+
+  async function checkSatBotStatus() {
+    const responseBox = document.getElementById('chatbotResponse');
+    try {
+      const response = await fetch(SAT_BOT_API_URL, {
+        method: 'GET',
+        cache: 'no-store'
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'AI Tutor API unavailable');
+      }
+
+      console.log('✅ AI Tutor API ready:', data);
+    } catch (error) {
+      console.warn('⚠️ AI Tutor API status check failed:', error);
+      if (responseBox && !responseBox.textContent.trim()) {
+        responseBox.innerHTML =
+          '⚠️ AI Tutor is temporarily unavailable.<br>' +
+          '<small>Please check the Vercel deployment and environment variables.</small>';
+      }
+    }
+  }
+
   async function sendChatbotMessage() {
     const questionInput = document.getElementById('chatbotQuestion');
     const responseDiv = document.getElementById('chatbotResponse');
@@ -1160,10 +1510,17 @@
     questionInput.disabled = true;
 
     try {
-      const res = await fetch('https://sat-bot-07020143.vercel.app/api/chat', {
+      const res = await fetch(SAT_BOT_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problemNumber: problemNumber, question: question })
+        body: JSON.stringify({
+          problemNumber: problemNumber,
+          question: question,
+          context: (typeof window.getCurrentQuestionContext === 'function')
+            ? window.getCurrentQuestionContext()
+            : null,
+          schemaVersion: 'SAT_MULTILANG_V2'
+        })
       });
 
       const data = await res.json();
@@ -1171,7 +1528,9 @@
       if (res.ok) {
         responseDiv.innerHTML = '🤖 ' + (data.message || data.response || 'No response.');
       } else {
-        responseDiv.innerHTML = '❌ Error: ' + (data.error || 'Unknown error');
+        responseDiv.innerHTML =
+          '❌ Error: ' + (data.error || data.message || 'Unknown error') +
+          '<br><small>HTTP ' + res.status + ' · SAT_MULTILANG_V2</small>';
       }
     } catch (e) {
       responseDiv.innerHTML = '❌ Network error: Could not reach server.';
@@ -1225,5 +1584,10 @@
       }
     }
   })();
+
+
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(checkSatBotStatus, 1200);
+  });
 
 </script>
