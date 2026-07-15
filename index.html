@@ -10,15 +10,6 @@
 <!-- ============================================================ -->
 <!-- BLOCK 02: 타이머 UI -->
 <!-- ============================================================ -->
-<div class="timer-container" id="timerContainer">
-  <div class="timer-display" id="timerDisplay">02:14:00</div>
-  <div class="timer-label">⏱️ Time Remaining</div>
-  <div class="timer-controls">
-    <button class="timer-btn" id="timerPauseBtn">⏸ Pause</button>
-    <button class="timer-btn reset-btn" id="timerResetBtn">↺ Reset</button>
-  </div>
-</div>
-
 <!-- ============================================================ -->
 <!-- BLOCK 03: 스플래시 오버레이 (로딩 화면) -->
 <!-- ============================================================ -->
@@ -52,6 +43,45 @@
         <option value="KO">한국어</option>
       </select>
     </div>
+
+    <div class="quiz-tools" aria-label="Quiz tools">
+      <button type="button" id="calculatorToggle" class="quiz-tool-toggle" aria-label="Open calculator" aria-controls="calculatorPanel" aria-expanded="false">🧮</button>
+      <button type="button" id="timerToggle" class="quiz-tool-toggle quiz-timer-toggle" aria-label="Open timer" aria-controls="timerPanel" aria-expanded="false"><span aria-hidden="true">⏱️</span><span id="headerTimerDisplay" class="header-timer-display">02:14:00</span></button>
+    </div>
+    <section id="calculatorPanel" class="quiz-tool-panel calculator-panel" aria-label="Scientific calculator" hidden>
+      <div class="tool-panel-head"><span>Scientific Calculator</span><span id="calculatorTimerMirror" class="calculator-timer-mirror">02:14:00</span><button type="button" class="tool-close" data-close-tool aria-label="Close calculator">×</button></div>
+      <div id="calculatorExpression" class="calculator-expression" aria-live="polite"></div>
+      <input id="calculatorDisplay" class="calculator-display" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Calculator expression" value="0">
+      <div class="calculator-toolbar">
+        <button type="button" id="calculatorAngleMode" data-calc-action="angle">DEG</button>
+        <button type="button" data-calc-action="memory-clear">MC</button><button type="button" data-calc-action="memory-recall">MR</button>
+        <button type="button" data-calc-action="memory-add">M+</button><button type="button" data-calc-action="memory-subtract">M−</button>
+      </div>
+      <div class="calculator-grid">
+        <button data-calc-value="sin(">sin</button><button data-calc-value="cos(">cos</button><button data-calc-value="tan(">tan</button><button data-calc-value="asin(">sin⁻¹</button><button data-calc-value="acos(">cos⁻¹</button><button data-calc-value="atan(">tan⁻¹</button>
+        <button data-calc-value="log10(">log</button><button data-calc-value="log(">ln</button><button data-calc-value="sqrt(">√</button><button data-calc-value="abs(">abs</button><button data-calc-value="exp(">eˣ</button><button data-calc-value="!">x!</button>
+        <button data-calc-value="pi">π</button><button data-calc-value="e">e</button><button data-calc-value="(">(</button><button data-calc-value=")">)</button><button data-calc-value="^">xʸ</button><button data-calc-value="%">%</button>
+        <button class="calc-danger" data-calc-action="clear">C</button><button data-calc-action="backspace">⌫</button><button data-calc-value="7">7</button><button data-calc-value="8">8</button><button data-calc-value="9">9</button><button class="calc-operator" data-calc-value="/">÷</button>
+        <button data-calc-value="ans">Ans</button><button data-calc-action="sign">±</button><button data-calc-value="4">4</button><button data-calc-value="5">5</button><button data-calc-value="6">6</button><button class="calc-operator" data-calc-value="*">×</button>
+        <button data-calc-value="1/(">1/x</button><button data-calc-value="^2">x²</button><button data-calc-value="1">1</button><button data-calc-value="2">2</button><button data-calc-value="3">3</button><button class="calc-operator" data-calc-value="-">−</button>
+        <button data-calc-value="0">0</button><button data-calc-value=".">.</button><button data-calc-value=",">,</button><button class="calc-equals" data-calc-action="equals">=</button><button class="calc-operator" data-calc-value="+">+</button><button data-calc-value="mod">mod</button>
+      </div>
+    </section>
+    <section id="timerPanel" class="quiz-tool-panel timer-tool-panel" aria-label="Quiz timer" hidden>
+      <div class="tool-panel-head"><span>Timer</span><button type="button" class="tool-close" data-close-tool aria-label="Close timer">×</button></div>
+      <div class="timer-display" id="timerDisplay" aria-live="polite">02:14:00</div>
+      <div class="timer-label">Time Remaining</div>
+      <div class="timer-setting" aria-label="Set timer duration">
+        <label>HH<input id="timerHours" type="number" min="0" max="99" value="2" inputmode="numeric"></label><span>:</span>
+        <label>MM<input id="timerMinutes" type="number" min="0" max="59" value="14" inputmode="numeric"></label><span>:</span>
+        <label>SS<input id="timerSecondsInput" type="number" min="0" max="59" value="0" inputmode="numeric"></label>
+        <button type="button" id="timerSetBtn" class="timer-set-btn">Set</button>
+      </div>
+      <div class="timer-controls">
+        <button type="button" class="timer-btn" id="timerPauseBtn">▶ Start</button>
+        <button type="button" class="timer-btn reset-btn" id="timerResetBtn">↺ Reset</button>
+      </div>
+    </section>
 
     <div class="learning-mode-panel" aria-label="Learning mode preview">
       <div id="modeButtons" class="mode-buttons">
@@ -1348,6 +1378,8 @@
     display:none !important;
   }
 
+  .quiz-tools{position:absolute;top:16px;right:18px;display:flex;gap:8px;z-index:35}.quiz-tool-toggle{width:42px;height:42px;border:1px solid rgba(255,255,255,.3);border-radius:10px;background:rgba(255,255,255,.12);color:#fff;font-size:21px;cursor:pointer;display:grid;place-items:center;transition:.18s}.quiz-tool-toggle:hover,.quiz-tool-toggle[aria-expanded="true"]{background:#fff;color:#111;transform:translateY(-1px)}.quiz-tool-toggle:focus-visible,.quiz-tool-panel button:focus-visible,.quiz-tool-panel input:focus-visible{outline:3px solid #68b5ff;outline-offset:2px}.quiz-tool-panel{position:absolute;z-index:50;top:66px;right:18px;width:min(430px,calc(100vw - 32px));box-sizing:border-box;border:1px solid #cbd5e1;border-radius:16px;background:#f8fafc;color:#111827;box-shadow:0 18px 50px rgba(0,0,0,.32);padding:14px}.quiz-tool-panel[hidden]{display:none!important}.tool-panel-head{display:flex;align-items:center;gap:10px;font-weight:800;margin-bottom:10px}.tool-panel-head>span:first-child{margin-right:auto}.tool-close{width:32px;height:32px;border:0;border-radius:8px;background:#e2e8f0;font-size:22px;cursor:pointer}.calculator-timer-mirror{font:700 15px ui-monospace,Consolas,monospace;color:#2563eb}.calculator-expression{min-height:20px;text-align:right;color:#64748b;font:13px ui-monospace,Consolas,monospace;overflow:hidden}.calculator-display{width:100%;height:55px;box-sizing:border-box;border:2px solid #94a3b8;border-radius:10px;background:#fff;padding:8px 12px;text-align:right;font:700 25px ui-monospace,Consolas,monospace}.calculator-toolbar,.calculator-grid{display:grid;gap:6px;margin-top:9px}.calculator-toolbar{grid-template-columns:repeat(5,1fr)}.calculator-grid{grid-template-columns:repeat(6,1fr)}.calculator-toolbar button,.calculator-grid button{min-height:39px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#172033;font-weight:700;cursor:pointer}.calculator-grid button:hover,.calculator-toolbar button:hover{background:#e0ecff}.calculator-grid .calc-operator{background:#e8eef7}.calculator-grid .calc-danger{background:#fee2e2;color:#b91c1c}.calculator-grid .calc-equals{background:#2563eb;color:#fff}.timer-tool-panel{width:min(360px,calc(100vw - 32px))}.timer-tool-panel .timer-display{font:800 42px ui-monospace,Consolas,monospace;text-align:center;color:#111827}.timer-tool-panel .timer-display.warning{color:#dc2626}.timer-tool-panel .timer-label{text-align:center;color:#64748b;margin-bottom:12px}.timer-setting{display:flex;align-items:end;justify-content:center;gap:5px;padding:10px 0}.timer-setting label{display:grid;gap:3px;text-align:center;font-size:10px;color:#64748b}.timer-setting input{width:54px;box-sizing:border-box;border:1px solid #94a3b8;border-radius:7px;padding:8px 4px;text-align:center;font-weight:700}.timer-set-btn,.timer-controls .timer-btn{border:0;border-radius:8px;padding:10px 13px;font-weight:800;cursor:pointer}.timer-set-btn{background:#334155;color:#fff}.timer-controls{display:flex;gap:8px}.timer-controls .timer-btn{flex:1;background:#2563eb;color:#fff}.timer-controls .reset-btn{background:#e2e8f0;color:#334155}@media(max-width:820px){.quiz-header{padding-top:68px}.quiz-tools{top:12px;right:12px}.quiz-tool-panel{position:fixed;top:auto;right:8px;bottom:8px;left:8px;width:auto;max-height:calc(100vh - 16px);overflow:auto}.calculator-grid{gap:5px}.calculator-toolbar button,.calculator-grid button{min-height:38px;font-size:12px}}@media(max-width:420px){.quiz-tool-toggle{width:40px;height:40px}.quiz-tool-panel{padding:10px}.calculator-grid{grid-template-columns:repeat(4,1fr)}.timer-setting input{width:48px}}
+  .quiz-tools{align-items:center}.quiz-timer-toggle{width:auto;min-width:126px;padding:0 11px;display:flex;gap:7px}.header-timer-display{font:800 15px ui-monospace,Consolas,monospace;letter-spacing:.4px;font-variant-numeric:tabular-nums}@media(max-width:420px){.quiz-timer-toggle{min-width:112px;padding:0 8px}.header-timer-display{font-size:13px}}
 </style>
 
 <!-- ============================================================ -->
@@ -1359,7 +1391,7 @@
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0C11';
+import { initialize } from './main.js?v=8.0C12-TOOLS1';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();

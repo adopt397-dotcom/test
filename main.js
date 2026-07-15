@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C10');
+      window.location.replace('./login.html?v=8.0C12-TOOLS1');
       return false;
     }
   }
@@ -535,6 +535,18 @@ DOM.progressCancelBtn = null;
 DOM.timerDisplay = null;
 DOM.timerPauseBtn = null;
 DOM.timerResetBtn = null;
+DOM.timerSetBtn = null;
+DOM.timerHours = null;
+DOM.timerMinutes = null;
+DOM.timerSecondsInput = null;
+DOM.calculatorToggle = null;
+DOM.timerToggle = null;
+DOM.calculatorPanel = null;
+DOM.timerPanel = null;
+DOM.calculatorDisplay = null;
+DOM.calculatorExpression = null;
+DOM.calculatorTimerMirror = null;
+DOM.headerTimerDisplay = null;
 DOM.languageSelector = null;
 DOM.modeButtons = null;
 DOM.modeDescription = null;
@@ -586,6 +598,18 @@ function initDOM() {
     DOM.timerDisplay = document.getElementById('timerDisplay');
     DOM.timerPauseBtn = document.getElementById('timerPauseBtn');
     DOM.timerResetBtn = document.getElementById('timerResetBtn');
+    DOM.timerSetBtn = document.getElementById('timerSetBtn');
+    DOM.timerHours = document.getElementById('timerHours');
+    DOM.timerMinutes = document.getElementById('timerMinutes');
+    DOM.timerSecondsInput = document.getElementById('timerSecondsInput');
+    DOM.calculatorToggle = document.getElementById('calculatorToggle');
+    DOM.timerToggle = document.getElementById('timerToggle');
+    DOM.calculatorPanel = document.getElementById('calculatorPanel');
+    DOM.timerPanel = document.getElementById('timerPanel');
+    DOM.calculatorDisplay = document.getElementById('calculatorDisplay');
+    DOM.calculatorExpression = document.getElementById('calculatorExpression');
+    DOM.calculatorTimerMirror = document.getElementById('calculatorTimerMirror');
+    DOM.headerTimerDisplay = document.getElementById('headerTimerDisplay');
     DOM.languageSelector = document.getElementById('languageSelector');
     DOM.modeButtons = document.getElementById('modeButtons');
     DOM.modeDescription = document.getElementById('modeDescription');
@@ -1797,10 +1821,15 @@ function startWrongOnlyReview() {
 // ========================================================================
 // BLOCK 1000: 타이머 함수 (원본 B010)
 // ========================================================================
-var timerSeconds = 134 * 60;
+var TIMER_DEFAULT_SECONDS = 134 * 60;
+var timerConfiguredSeconds = TIMER_DEFAULT_SECONDS;
+var timerSeconds = timerConfiguredSeconds;
 var timerInterval = null;
 var timerRunning = false;
 var timerPaused = false;
+var timerEndsAt = 0;
+var quizToolsInitialized = false;
+var calculatorState = { expression: '', answer: 0, memory: 0, angle: 'DEG', justEvaluated: false };
 
 function formatTimer(seconds) {
   var hrs = Math.floor(seconds / 3600);
@@ -1812,48 +1841,50 @@ function formatTimer(seconds) {
 }
 
 function updateTimerDisplay() {
-  var display = DOM.timerDisplay;
-  if (display) {
-    display.textContent = formatTimer(timerSeconds);
-    if (timerSeconds < 300) {
-      display.classList.add('warning');
-    } else {
-      display.classList.remove('warning');
-    }
+  var formatted = formatTimer(timerSeconds);
+  if (DOM.timerDisplay) {
+    DOM.timerDisplay.textContent = formatted;
+    DOM.timerDisplay.classList.toggle('warning', timerSeconds > 0 && timerSeconds < 300);
   }
+  if (DOM.calculatorTimerMirror) DOM.calculatorTimerMirror.textContent = formatted;
+  if (DOM.headerTimerDisplay) DOM.headerTimerDisplay.textContent = formatted;
+  if (DOM.timerPauseBtn) DOM.timerPauseBtn.textContent = timerRunning ? '⏸ Pause' : (timerPaused ? '▶ Resume' : '▶ Start');
 }
 
 function startTimer() {
-  if (timerInterval) return;
+  if (timerInterval || timerSeconds <= 0) return;
   timerRunning = true;
   timerPaused = false;
-  var btn = DOM.timerPauseBtn;
-  if (btn) btn.textContent = '⏸ Pause';
+  timerEndsAt = Date.now() + timerSeconds * 1000;
+  updateTimerDisplay();
   timerInterval = setInterval(function() {
-    if (timerSeconds > 0) {
-      timerSeconds--;
+    timerSeconds = Math.max(0, Math.ceil((timerEndsAt - Date.now()) / 1000));
+    updateTimerDisplay();
+    if (timerSeconds === 0) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      timerRunning = false;
+      timerPaused = false;
       updateTimerDisplay();
-      if (timerSeconds === 0) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-        timerRunning = false;
-        alert('⏰ Time is up!');
-      }
+      alert('⏰ Time is up!');
     }
-  }, 1000);
+  }, 250);
 }
 
 function pauseTimer() {
   if (timerInterval) {
+    timerSeconds = Math.max(0, Math.ceil((timerEndsAt - Date.now()) / 1000));
     clearInterval(timerInterval);
     timerInterval = null;
     timerRunning = false;
     timerPaused = true;
-    var btn = DOM.timerPauseBtn;
-    if (btn) btn.textContent = '▶ Resume';
   } else if (timerPaused) {
     startTimer();
+    return;
+  } else {
+    startTimer();
   }
+  updateTimerDisplay();
 }
 
 function resetTimer() {
@@ -1861,21 +1892,134 @@ function resetTimer() {
     clearInterval(timerInterval);
     timerInterval = null;
   }
-  timerSeconds = 134 * 60;
+  timerSeconds = timerConfiguredSeconds;
   timerRunning = false;
   timerPaused = false;
-  var btn = DOM.timerPauseBtn;
-  if (btn) btn.textContent = '⏸ Pause';
   updateTimerDisplay();
 }
 
+function setTimerFromInputs() {
+  var hours = Math.max(0, Math.min(99, parseInt(DOM.timerHours && DOM.timerHours.value, 10) || 0));
+  var minutes = Math.max(0, Math.min(59, parseInt(DOM.timerMinutes && DOM.timerMinutes.value, 10) || 0));
+  var seconds = Math.max(0, Math.min(59, parseInt(DOM.timerSecondsInput && DOM.timerSecondsInput.value, 10) || 0));
+  var total = hours * 3600 + minutes * 60 + seconds;
+  if (!total) { alert('Set a timer longer than 00:00:00.'); return; }
+  timerConfiguredSeconds = total;
+  if (DOM.timerHours) DOM.timerHours.value = hours;
+  if (DOM.timerMinutes) DOM.timerMinutes.value = minutes;
+  if (DOM.timerSecondsInput) DOM.timerSecondsInput.value = seconds;
+  resetTimer();
+}
+
+function closeQuizTools() {
+  [DOM.calculatorPanel, DOM.timerPanel].forEach(function(panel) { if (panel) panel.hidden = true; });
+  [DOM.calculatorToggle, DOM.timerToggle].forEach(function(button) { if (button) button.setAttribute('aria-expanded', 'false'); });
+}
+
+function toggleQuizTool(panel, button) {
+  var shouldOpen = !!(panel && panel.hidden);
+  closeQuizTools();
+  if (shouldOpen) {
+    panel.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
+    var focusTarget = panel === DOM.calculatorPanel ? DOM.calculatorDisplay : DOM.timerPauseBtn;
+    if (focusTarget) focusTarget.focus();
+  }
+}
+
+function normalizeCalculatorExpression(expression) {
+  var source = String(expression || '').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
+  if (!/^[0-9+\-*/^().,%!\s_a-zA-Zπ√]+$/.test(source)) throw new Error('Unsupported input');
+  source = source.replace(/π/g, 'pi').replace(/√/g, 'sqrt').replace(/\bans\b/gi, '(' + calculatorState.answer + ')');
+  source = source.replace(/(\d+(?:\.\d+)?|\))%/g, '($1/100)');
+  if (calculatorState.angle === 'DEG') {
+    source = source.replace(/\b(sin|cos|tan)\s*\(/g, '$1(pi/180*');
+    source = source.replace(/\b(asin|acos|atan)\s*\(([^()]*)\)/g, '(180/pi*$1($2))');
+  }
+  return source;
+}
+
+function safeArithmeticFallback(expression) {
+  var source = expression.replace(/\s+/g, '');
+  if (!/^[0-9.+\-*/^()]+$/.test(source)) throw new Error('Scientific functions require Math.js');
+  var tokens = source.match(/(?:\d+(?:\.\d*)?|\.\d+)|[()+\-*/^]/g) || [];
+  if (tokens.join('') !== source) throw new Error('Invalid expression');
+  var output = [], operators = [], precedence = { '+':1, '-':1, '*':2, '/':2, '^':3, 'u-':4 }, previous = 'operator';
+  tokens.forEach(function(token) {
+    if (/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(token)) { output.push(Number(token)); previous = 'number'; return; }
+    if (token === '(') { operators.push(token); previous = 'operator'; return; }
+    if (token === ')') { while (operators.length && operators[operators.length - 1] !== '(') output.push(operators.pop()); if (operators.pop() !== '(') throw new Error('Parenthesis'); previous = 'number'; return; }
+    var op = token === '-' && previous !== 'number' ? 'u-' : token;
+    while (operators.length && operators[operators.length - 1] !== '(' && ((op === '^' || op === 'u-') ? precedence[operators[operators.length - 1]] > precedence[op] : precedence[operators[operators.length - 1]] >= precedence[op])) output.push(operators.pop());
+    operators.push(op); previous = 'operator';
+  });
+  while (operators.length) { var remaining = operators.pop(); if (remaining === '(') throw new Error('Parenthesis'); output.push(remaining); }
+  var stack = [];
+  output.forEach(function(item) { if (typeof item === 'number') stack.push(item); else if (item === 'u-') stack.push(-stack.pop()); else { var b = stack.pop(), a = stack.pop(); if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error('Operand'); stack.push(item === '+' ? a+b : item === '-' ? a-b : item === '*' ? a*b : item === '/' ? a/b : Math.pow(a,b)); } });
+  if (stack.length !== 1 || !Number.isFinite(stack[0])) throw new Error('Invalid result');
+  return stack[0];
+}
+
+function evaluateCalculator() {
+  var raw = DOM.calculatorDisplay ? DOM.calculatorDisplay.value : calculatorState.expression;
+  try {
+    var normalized = normalizeCalculatorExpression(raw);
+    var result = window.math && typeof window.math.evaluate === 'function' ? window.math.evaluate(normalized) : safeArithmeticFallback(normalized);
+    if (result && typeof result === 'object' && typeof result.toNumber === 'function') result = result.toNumber();
+    if (typeof result !== 'number' || !Number.isFinite(result)) throw new Error('Invalid result');
+    calculatorState.answer = Number(result.toPrecision(14));
+    calculatorState.expression = String(calculatorState.answer);
+    calculatorState.justEvaluated = true;
+    if (DOM.calculatorExpression) DOM.calculatorExpression.textContent = raw + ' =';
+    if (DOM.calculatorDisplay) DOM.calculatorDisplay.value = calculatorState.expression;
+  } catch (error) {
+    calculatorState.justEvaluated = true;
+    if (DOM.calculatorExpression) DOM.calculatorExpression.textContent = 'Invalid expression';
+    if (DOM.calculatorDisplay) DOM.calculatorDisplay.value = 'Error';
+  }
+}
+
+function appendCalculatorValue(value) {
+  if (!DOM.calculatorDisplay) return;
+  var current = DOM.calculatorDisplay.value;
+  if (current === '0' || current === 'Error' || calculatorState.justEvaluated && /^[0-9.(a-z]/i.test(value)) current = '';
+  calculatorState.justEvaluated = false;
+  DOM.calculatorDisplay.value = current + value;
+  calculatorState.expression = DOM.calculatorDisplay.value;
+}
+
+function handleCalculatorAction(action) {
+  if (!DOM.calculatorDisplay) return;
+  if (action === 'equals') return evaluateCalculator();
+  if (action === 'clear') { calculatorState.expression = ''; calculatorState.justEvaluated = false; DOM.calculatorDisplay.value = '0'; if (DOM.calculatorExpression) DOM.calculatorExpression.textContent = ''; return; }
+  if (action === 'backspace') { DOM.calculatorDisplay.value = DOM.calculatorDisplay.value.length > 1 ? DOM.calculatorDisplay.value.slice(0,-1) : '0'; return; }
+  if (action === 'sign') { DOM.calculatorDisplay.value = DOM.calculatorDisplay.value.charAt(0) === '-' ? DOM.calculatorDisplay.value.slice(1) : '-(' + DOM.calculatorDisplay.value + ')'; return; }
+  if (action === 'angle') { calculatorState.angle = calculatorState.angle === 'DEG' ? 'RAD' : 'DEG'; var angleButton = document.getElementById('calculatorAngleMode'); if (angleButton) angleButton.textContent = calculatorState.angle; return; }
+  if (action === 'memory-clear') calculatorState.memory = 0;
+  if (action === 'memory-recall') appendCalculatorValue(String(calculatorState.memory));
+  if (action === 'memory-add' || action === 'memory-subtract') { evaluateCalculator(); calculatorState.memory += (action === 'memory-add' ? 1 : -1) * calculatorState.answer; }
+}
+
 function initTimer() {
+  if (quizToolsInitialized) return;
+  quizToolsInitialized = true;
   updateTimerDisplay();
-  var pauseBtn = DOM.timerPauseBtn;
-  var resetBtn = DOM.timerResetBtn;
-  if (pauseBtn) pauseBtn.addEventListener('click', pauseTimer);
-  if (resetBtn) resetBtn.addEventListener('click', function() {
+  if (DOM.timerPauseBtn) DOM.timerPauseBtn.addEventListener('click', pauseTimer);
+  if (DOM.timerResetBtn) DOM.timerResetBtn.addEventListener('click', function() {
     if (confirm('Reset timer?')) resetTimer();
+  });
+  if (DOM.timerSetBtn) DOM.timerSetBtn.addEventListener('click', setTimerFromInputs);
+  if (DOM.calculatorToggle) DOM.calculatorToggle.addEventListener('click', function() { toggleQuizTool(DOM.calculatorPanel, DOM.calculatorToggle); });
+  if (DOM.timerToggle) DOM.timerToggle.addEventListener('click', function() { toggleQuizTool(DOM.timerPanel, DOM.timerToggle); });
+  document.querySelectorAll('[data-close-tool]').forEach(function(button) { button.addEventListener('click', closeQuizTools); });
+  if (DOM.calculatorPanel) DOM.calculatorPanel.addEventListener('click', function(event) { var button = event.target.closest('button'); if (!button) return; if (button.dataset.calcValue !== undefined) appendCalculatorValue(button.dataset.calcValue); else if (button.dataset.calcAction) handleCalculatorAction(button.dataset.calcAction); });
+  if (DOM.calculatorDisplay) DOM.calculatorDisplay.addEventListener('input', function() { calculatorState.expression = this.value; calculatorState.justEvaluated = false; });
+  document.addEventListener('keydown', function(event) {
+    var calculatorOpen = DOM.calculatorPanel && !DOM.calculatorPanel.hidden;
+    var timerOpen = DOM.timerPanel && !DOM.timerPanel.hidden;
+    if (event.key === 'Escape' && (calculatorOpen || timerOpen)) { event.preventDefault(); closeQuizTools(); return; }
+    if (!calculatorOpen || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === 'Enter' || event.key === '=') { event.preventDefault(); evaluateCalculator(); }
   });
 }
 
