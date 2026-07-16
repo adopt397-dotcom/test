@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C12-TIMER7');
+      window.location.replace('./login.html?v=8.0C12-TIMER8');
       return false;
     }
   }
@@ -1893,10 +1893,16 @@ function pauseTimer() {
   updateTimerDisplay();
 }
 
-function resetTimer() {
+function resetTimer(clearConfiguration) {
   if (timerInterval) {
     clearInterval(timerInterval);
     timerInterval = null;
+  }
+  if (clearConfiguration === true) {
+    timerConfiguredSeconds = 0;
+    if (DOM.timerHours) DOM.timerHours.value = '';
+    if (DOM.timerMinutes) DOM.timerMinutes.value = '';
+    if (DOM.timerSecondsInput) DOM.timerSecondsInput.value = '';
   }
   timerSeconds = timerConfiguredSeconds;
   timerRunning = false;
@@ -2019,7 +2025,9 @@ function initTimer() {
       updateTimerDisplay();
     }
   });
-  if (DOM.timerResetBtn) DOM.timerResetBtn.addEventListener('click', resetTimer);
+  if (DOM.timerResetBtn) DOM.timerResetBtn.addEventListener('click', function() {
+    resetTimer(true);
+  });
   if (DOM.timerSetBtn) DOM.timerSetBtn.addEventListener('click', setTimerFromInputs);
   [DOM.timerHours, DOM.timerMinutes, DOM.timerSecondsInput].forEach(function(input) {
     if (!input) return;
