@@ -186,6 +186,13 @@
         .subject-btn { width:100%; padding:15px; border:2px solid #e5e7eb; border-radius:12px; background:#fff; color:#24324a; font-weight:700; cursor:pointer; text-align:left; }
         .subject-btn:hover, .subject-btn:focus { border-color:#f5a623; background:#fff8eb; outline:none; }
         .subject-meta { display:block; margin-top:4px; color:#667085; font-size:12px; font-weight:400; }
+        body.subject-selection .tabs,
+        body.subject-selection .subtitle,
+        body.subject-selection #loginTab > .form-group,
+        body.subject-selection #testLoginBtn,
+        body.subject-selection #loginResult { display:none !important; }
+        body.subject-selection .container { padding-top:24px; }
+        body.subject-selection .subject-picker { margin-top:10px; }
     </style>
 </head>
 <body>
@@ -393,6 +400,7 @@
                 picker.style.display = 'none';
                 return;
             }
+            document.body.classList.add('subject-selection');
             subjects.forEach(subject => {
                 const button = document.createElement('button');
                 button.type = 'button';
@@ -404,7 +412,7 @@
                 button.appendChild(meta);
                 button.addEventListener('click', () => {
                     localStorage.setItem('quiz_current_subject_v1', JSON.stringify(subject));
-                    window.location.href = './index.html?v=8.0C12-TIMER9';
+                    window.location.href = './index.html?v=8.0C12-TIMER10';
                 });
                 list.appendChild(button);
             });

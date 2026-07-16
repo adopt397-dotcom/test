@@ -155,7 +155,7 @@ function applySubjectConfig() {
         QUESTION_COUNT: 1440
       };
     } else {
-      window.location.replace('./login.html?v=8.0C12-TIMER9');
+      window.location.replace('./login.html?v=8.0C12-TIMER10');
       return false;
     }
   }
