@@ -9,7 +9,7 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 8.0D (FREE TRIAL / Full / Admin unified access)
+// 버전: 8.0E (FREE TRIAL only after signup/login)
 // 날짜: 2026-07-12
 // 설명: 표준 다국어 스키마 + 언어 전환 + 기존 그래픽/퀴즈 엔진 통합
 // 표준 열: N, SUBJECT, Q_EN, Q_KO, P_EN, P_KO, 1_EN~4_KO, A, E_EN, E_KO, G, D,
@@ -105,8 +105,8 @@ var subjectConfig = null;
 var availableSubjects = [];
 var DATA_SHEET = 'sat';
 var CURRENT_SUBJECT = '';
-var STORAGE_KEY = 'quiz_progress_main_v8_0D_sat';
-var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0D_sat';
+var STORAGE_KEY = 'quiz_progress_main_v8_0E_sat';
+var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0E_sat';
 var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
 var MODE_STORAGE_KEY = 'quiz_mode_v8_0B';
 var SUPPORTED_MODES = ['learn', 'study', 'exam'];
@@ -143,7 +143,7 @@ function isAdministrator_() {
 function isTrialUser_() {
   if (isAdministrator_()) return false;
   return Boolean(
-    (currentUser && (currentUser.is_sample || String(currentUser.access_level || '').toLowerCase() === 'trial')) ||
+    (currentUser && (currentUser.is_sample || String(currentUser.access_level || '').toLowerCase() === 'trial' || String(currentUser.payment_status || '').toLowerCase() === 'p')) ||
     (subjectConfig && (subjectConfig.SAMPLE || subjectConfig.TRIAL))
   );
 }
@@ -199,7 +199,7 @@ function applySubjectConfig() {
     subjectConfig = null;
   }
   if (!subjectConfig || !subjectConfig.CODE || !subjectConfig.SHEET) {
-    window.location.replace('./login.html?v=8.0D-TRIAL-FULL-ADMIN');
+    window.location.replace('./login.html?v=8.0E-TRIAL-AFTER-SIGNUP');
     return false;
   }
   currentSubject = String(subjectConfig.CODE).trim().toUpperCase();
@@ -219,8 +219,8 @@ function applySubjectConfig() {
     TOTAL_QUESTIONS = Math.min(20, TOTAL_QUESTIONS || 20);
   }
   var keyPart = currentSubject.replace(/[^A-Z0-9_-]/g, '_');
-  STORAGE_KEY = 'quiz_progress_main_v8_0D_' + keyPart;
-  TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0D_' + keyPart;
+  STORAGE_KEY = 'quiz_progress_main_v8_0E_' + keyPart;
+  TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0E_' + keyPart;
   window.currentUser = currentUser;
   window.currentSubject = currentSubject;
   window.subjectConfig = subjectConfig;

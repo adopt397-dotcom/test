@@ -27,6 +27,7 @@ function doPost(e) {
     const pnCol = headers.indexOf('pn');
     const statusCol = headers.indexOf('payment_status');
     const accessSubjectsCol = headers.indexOf('access_subjects');
+    const accountTypeCol = headers.indexOf('account_type');
     
     if (emailCol === -1 || pinCol === -1 || nameCol === -1 || pnCol === -1 || statusCol === -1) {
       return createResponse(false, 'Required columns (email, pin, name, pn, payment_status) not found. Headers: ' + headers.join(', '));
@@ -37,10 +38,10 @@ function doPost(e) {
     switch(action) {
       case 'login':
         const subjectRows = subjectsSheet ? subjectsSheet.getDataRange().getValues() : [];
-        response = handleLogin(rows, emailCol, pinCol, statusCol, nameCol, accessSubjectsCol, subjectRows, data);
+        response = handleLogin(rows, emailCol, pinCol, statusCol, nameCol, accessSubjectsCol, accountTypeCol, subjectRows, data);
         break;
       case 'signup':
-        response = handleSignup(sheet, rows, emailCol, pinCol, nameCol, pnCol, statusCol, data);
+        response = handleSignup(sheet, rows, emailCol, pinCol, nameCol, pnCol, statusCol, accessSubjectsCol, accountTypeCol, data);
         break;
       case 'changePin':
         response = handleChangePin(sheet, rows, emailCol, pinCol, statusCol, data);
@@ -89,51 +90,92 @@ function logDebug(action, data) {
   Logger.log(JSON.stringify(logData));
 }
 
-function handleLogin(rows, emailCol, pinCol, statusCol, nameCol, accessSubjectsCol, subjectRows, data) {
+function handleLogin(rows, emailCol, pinCol, statusCol, nameCol, accessSubjectsCol, accountTypeCol, subjectRows, data) {
   const email = String(data.email || '').trim();
   const pin = String(data.pin || '').trim();
-  
+
   if (!isValidEmail(email)) {
     return createResponse(false, 'Invalid email format.');
   }
-  
-  const user = findUserByEmail(rows, emailCol, email);
-  if (!user) {
+
+  const found = findUserByEmail(rows, emailCol, email);
+  if (!found) {
     return createResponse(false, 'Email or PIN incorrect.');
   }
-  
-  const row = user.row;
+
+  const row = found.row;
   const rowPin = String(row[pinCol] || '').trim();
   if (rowPin !== pin) {
     return createResponse(false, 'Email or PIN incorrect.');
   }
-  
+
   const status = String(row[statusCol] || '').trim().toLowerCase();
-  
-  // 🔥 상태별 처리
-  if (status === 'a') {
-    const subjects = buildAllowedSubjects_(row[accessSubjectsCol], subjectRows);
-    return createResponse(true, 'Login successful', { 
-      name: row[nameCol] || '',
+  const accountType = accountTypeCol >= 0
+    ? String(row[accountTypeCol] || 'personal').trim().toLowerCase()
+    : 'personal';
+  const isAdmin = accountType === 'admin';
+
+  // 관리자: 모든 활성 과목 사용 + index.html에서 복사 제한 해제
+  if (isAdmin) {
+    const subjects = buildAllActiveSubjects_(subjectRows, false);
+    return createResponse(true, 'Administrator login successful', {
       status: 'active',
       user: {
         name: row[nameCol] || '',
-        email: email
+        email: email,
+        account_type: 'admin',
+        payment_status: status,
+        is_sample: false,
+        access_level: 'admin'
       },
       subjects: subjects
     });
-  } else if (status === 'p') {
-    return createResponse(false, 'Account pending approval. Please wait for admin confirmation.', { status: 'pending' });
-  } else if (status === 'e') {
-    return createResponse(false, 'Your subscription has expired. Please renew.', { status: 'expired' });
-  } else if (status === 'n') {
-    return createResponse(false, 'No active subscription. Please purchase a plan.', { status: 'none' });
-  } else {
-    return createResponse(false, 'Account status unknown. Contact support.', { status: 'unknown' });
   }
+
+  // 정회원: 구매한 과목 전체 이용
+  if (status === 'a') {
+    const subjects = buildAllowedSubjects_(row[accessSubjectsCol], subjectRows);
+    return createResponse(true, 'Login successful', {
+      status: 'active',
+      user: {
+        name: row[nameCol] || '',
+        email: email,
+        account_type: accountType || 'personal',
+        payment_status: 'a',
+        is_sample: false,
+        access_level: 'full'
+      },
+      subjects: subjects
+    });
+  }
+
+  // FREE TRIAL: 로그인 허용 + 모든 활성 과목의 첫 20문제 이용
+  if (status === 'p') {
+    const sampleSubjects = buildAllActiveSubjects_(subjectRows, true);
+    return createResponse(true, 'FREE TRIAL is ready. Choose any subject and use questions 1-20. Upgrade for Full Access.', {
+      status: 'trial',
+      user: {
+        name: row[nameCol] || '',
+        email: email,
+        account_type: accountType || 'personal',
+        payment_status: 'p',
+        is_sample: true,
+        access_level: 'trial'
+      },
+      subjects: sampleSubjects
+    });
+  }
+
+  if (status === 'e') {
+    return createResponse(false, 'Your subscription has expired. Please renew.', { status: 'expired' });
+  }
+  if (status === 'n') {
+    return createResponse(false, 'No active subscription. Please purchase a plan.', { status: 'none' });
+  }
+  return createResponse(false, 'Account status unknown. Contact support.', { status: 'unknown' });
 }
 
-function handleSignup(sheet, rows, emailCol, pinCol, nameCol, pnCol, statusCol, data) {
+function handleSignup(sheet, rows, emailCol, pinCol, nameCol, pnCol, statusCol, accessSubjectsCol, accountTypeCol, data) {
   const email = String(data.email || '').trim();
   const pin = String(data.pin || '').trim();
   const name = String(data.name || '').trim();
@@ -170,10 +212,13 @@ function handleSignup(sheet, rows, emailCol, pinCol, nameCol, pnCol, statusCol, 
   newRow[pinCol] = pin;
   newRow[nameCol] = name;
   newRow[pnCol] = pn;
+  // Internally p means payment pending. The same account receives FREE TRIAL access.
   newRow[statusCol] = 'p';
+  if (accessSubjectsCol >= 0) newRow[accessSubjectsCol] = '';
+  if (accountTypeCol >= 0) newRow[accountTypeCol] = 'personal';
   
   sheet.appendRow(newRow);
-  return createResponse(true, 'Signup complete. Awaiting admin approval.');
+  return createResponse(true, 'Signup complete. FREE TRIAL includes questions 1-20 in every active subject. Upgrade for Full Access.');
 }
 
 function handleChangePin(sheet, rows, emailCol, pinCol, statusCol, data) {
@@ -202,8 +247,8 @@ function handleChangePin(sheet, rows, emailCol, pinCol, statusCol, data) {
   }
   
   const status = String(row[statusCol] || '').trim().toLowerCase();
-  if (status !== 'a') {
-    return createResponse(false, 'Account not approved.');
+  if (status !== 'a' && status !== 'p') {
+    return createResponse(false, 'Password changes are unavailable for this account status.');
   }
   
   sheet.getRange(user.index + 1, pinCol + 1).setValue(newPin);
@@ -236,8 +281,8 @@ function handleChangePassword(sheet, rows, emailCol, pinCol, statusCol, data) {
   }
   
   const status = String(row[statusCol] || '').trim().toLowerCase();
-  if (status !== 'a') {
-    return createResponse(false, 'Account not approved.');
+  if (status !== 'a' && status !== 'p') {
+    return createResponse(false, 'Password changes are unavailable for this account status.');
   }
   
   sheet.getRange(user.index + 1, pinCol + 1).setValue(newPassword);
@@ -274,6 +319,42 @@ function doGet() {
 }
 
 // BLOCK 3000: Subject permissions (CSV only; no JSON in the sheet)
+function buildAllActiveSubjects_(rows, sampleMode) {
+  if (!rows || rows.length < 2) return [];
+  const headers = rows[0].map(function(value) {
+    return String(value || '').trim().toUpperCase();
+  });
+  const result = [];
+
+  for (let r = 1; r < rows.length; r++) {
+    const item = {};
+    headers.forEach(function(header, index) {
+      if (header) item[header] = rows[r][index];
+    });
+
+    const code = String(item.CODE || '').trim().toUpperCase();
+    const active = String(item.ACTIVE || '').trim().toUpperCase();
+    if (!code || ['TRUE', 'Y', 'YES', '1', 'ACTIVE', 'A'].indexOf(active) === -1) continue;
+
+    const fullCount = Math.max(0, parseInt(item.QUESTION_COUNT, 10) || 0);
+    result.push({
+      CODE: code,
+      NAME: String(item.NAME || code),
+      CATEGORY: String(item.CATEGORY || ''),
+      SHEET: String(item.SHEET || '').trim(),
+      SET_SIZE: sampleMode ? 20 : Math.max(1, parseInt(item.SET_SIZE, 10) || 120),
+      FORMAT: String(item.FORMAT || ''),
+      ACTIVE: item.ACTIVE,
+      VERSION: String(item.VERSION || ''),
+      QUESTION_COUNT: sampleMode ? Math.min(20, fullCount || 20) : fullCount,
+      SAMPLE: Boolean(sampleMode),
+      TRIAL: Boolean(sampleMode),
+      SAMPLE_LIMIT: sampleMode ? 20 : 0
+    });
+  }
+  return result;
+}
+
 function buildAllowedSubjects_(accessValue, rows) {
   if (!rows || rows.length < 2) return [];
   let rawAccess = accessValue;

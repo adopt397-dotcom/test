@@ -1408,7 +1408,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var user = JSON.parse(localStorage.getItem('quiz_current_user_v1') || 'null');
     if (!user) return;
     var isAdmin = String(user.account_type || '').toLowerCase() === 'admin';
-    var isTrial = !isAdmin && (user.is_sample || String(user.access_level || '').toLowerCase() === 'trial');
+    var isTrial = !isAdmin && (user.is_sample || String(user.access_level || '').toLowerCase() === 'trial' || String(user.payment_status || '').toLowerCase() === 'p');
     banner.textContent = isAdmin
       ? 'ADMIN ACCESS · All subjects and all questions'
       : isTrial
@@ -1421,7 +1421,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0D-TRIAL-FULL-ADMIN';
+import { initialize } from './main.js?v=8.0E-TRIAL-AFTER-SIGNUP';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
