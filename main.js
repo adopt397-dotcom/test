@@ -9,7 +9,7 @@
 // ========================================================================
 // BLOCK 0000: 시스템 메타 정보
 // ========================================================================
-// 버전: 8.0C (SAT Tutor context integration)
+// 버전: 8.0D (FREE TRIAL / Full / Admin unified access)
 // 날짜: 2026-07-12
 // 설명: 표준 다국어 스키마 + 언어 전환 + 기존 그래픽/퀴즈 엔진 통합
 // 표준 열: N, SUBJECT, Q_EN, Q_KO, P_EN, P_KO, 1_EN~4_KO, A, E_EN, E_KO, G, D,
@@ -105,8 +105,8 @@ var subjectConfig = null;
 var availableSubjects = [];
 var DATA_SHEET = 'sat';
 var CURRENT_SUBJECT = '';
-var STORAGE_KEY = 'quiz_progress_main_v8_0C_sat';
-var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0C_sat';
+var STORAGE_KEY = 'quiz_progress_main_v8_0D_sat';
+var TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0D_sat';
 var LANGUAGE_STORAGE_KEY = 'quiz_language_v7';
 var MODE_STORAGE_KEY = 'quiz_mode_v8_0B';
 var SUPPORTED_MODES = ['learn', 'study', 'exam'];
@@ -138,6 +138,14 @@ var contentProtectionHandlersAttached = false;
 
 function isAdministrator_() {
   return Boolean(currentUser && String(currentUser.account_type || '').toLowerCase() === 'admin');
+}
+
+function isTrialUser_() {
+  if (isAdministrator_()) return false;
+  return Boolean(
+    (currentUser && (currentUser.is_sample || String(currentUser.access_level || '').toLowerCase() === 'trial')) ||
+    (subjectConfig && (subjectConfig.SAMPLE || subjectConfig.TRIAL))
+  );
 }
 
 function blockProtectedAction_(event) {
@@ -191,20 +199,8 @@ function applySubjectConfig() {
     subjectConfig = null;
   }
   if (!subjectConfig || !subjectConfig.CODE || !subjectConfig.SHEET) {
-    var isAdminPage = /(?:^|\/)admin\.html$/i.test(window.location.pathname);
-    if (isAdminPage) {
-      subjectConfig = {
-        CODE: 'SAT',
-        NAME: 'Digital SAT',
-        CATEGORY: 'TEST',
-        SHEET: 'sat',
-        SET_SIZE: 120,
-        QUESTION_COUNT: 1440
-      };
-    } else {
-      window.location.replace('./login.html?v=8.0C12-TIMER9');
-      return false;
-    }
+    window.location.replace('./login.html?v=8.0D-TRIAL-FULL-ADMIN');
+    return false;
   }
   currentSubject = String(subjectConfig.CODE).trim().toUpperCase();
   CURRENT_SUBJECT = currentSubject;
@@ -215,15 +211,16 @@ function applySubjectConfig() {
   DATA_SHEET = sheetAliases[DATA_SHEET.toUpperCase()] || DATA_SHEET.toLowerCase();
   QUESTIONS_PER_SET = Math.max(1, parseInt(subjectConfig.SET_SIZE, 10) || 120);
   TOTAL_QUESTIONS = Math.max(0, parseInt(subjectConfig.QUESTION_COUNT, 10) || 0);
-  if (subjectConfig.SAMPLE || (currentUser && currentUser.is_sample)) {
+  if (isTrialUser_()) {
     subjectConfig.SAMPLE = true;
+    subjectConfig.TRIAL = true;
     subjectConfig.SAMPLE_LIMIT = 20;
     QUESTIONS_PER_SET = 20;
     TOTAL_QUESTIONS = Math.min(20, TOTAL_QUESTIONS || 20);
   }
   var keyPart = currentSubject.replace(/[^A-Z0-9_-]/g, '_');
-  STORAGE_KEY = 'quiz_progress_main_v8_0C_' + keyPart;
-  TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0C_' + keyPart;
+  STORAGE_KEY = 'quiz_progress_main_v8_0D_' + keyPart;
+  TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0D_' + keyPart;
   window.currentUser = currentUser;
   window.currentSubject = currentSubject;
   window.subjectConfig = subjectConfig;
@@ -1164,6 +1161,7 @@ function renderLearnPanel(q, displayAnswer) {
 function updateSetSelector() {
   var setSelector = DOM.setSelector;
   if (!setSelector) return;
+  var trialMode = isTrialUser_();
   while (setSelector.options.length > 0) {
     setSelector.remove(0);
   }
@@ -1174,7 +1172,7 @@ function updateSetSelector() {
     var end = Math.min(i * QUESTIONS_PER_SET, totalQuestions);
     var option = document.createElement('option');
     option.value = i;
-    option.textContent = 'Set ' + i + ' (Questions ' + start + '-' + end + ')';
+    option.textContent = trialMode ? 'FREE TRIAL (Questions 1-20)' : 'Set ' + i + ' (Questions ' + start + '-' + end + ')';
     setSelector.appendChild(option);
   }
   var maxStartNumber = Math.max(1, totalQuestions - QUESTIONS_PER_SET + 1);
@@ -1182,8 +1180,10 @@ function updateSetSelector() {
     DOM.maxNumberDisplay.innerHTML = maxStartNumber.toLocaleString();
   }
   if (DOM.startNumberInput) {
-    DOM.startNumberInput.placeholder = '1 ~ ' + maxStartNumber.toLocaleString();
-    DOM.startNumberInput.max = maxStartNumber;
+    DOM.startNumberInput.placeholder = trialMode ? 'FREE TRIAL: 1' : '1 ~ ' + maxStartNumber.toLocaleString();
+    DOM.startNumberInput.max = trialMode ? 1 : maxStartNumber;
+    DOM.startNumberInput.readOnly = trialMode;
+    DOM.startNumberInput.title = trialMode ? 'FREE TRIAL always starts at question 1.' : '';
   }
   if (setSelector.options.length > 0) {
     setSelector.value = '1';
@@ -1197,7 +1197,7 @@ function updateSetSelector() {
 // BLOCK 0720: detectTotalQuestions (타임아웃 + fallback)
 // ========================================================================
 async function detectTotalQuestions() {
-    if (subjectConfig && subjectConfig.SAMPLE) {
+    if (isTrialUser_()) {
         TOTAL_QUESTIONS = 20;
         return 20;
     }
@@ -5087,6 +5087,11 @@ function showProgressModal(saved) {
 }
 
 function resumeProgress(saved) {
+  if (isTrialUser_() && ((saved.currentStartNumber || 1) !== 1 || !Array.isArray(saved.currentQuestions) || saved.currentQuestions.length > 20)) {
+    clearProgress();
+    startQuizWithNumber(1);
+    return;
+  }
   currentQuestions = saved.currentQuestions;
   userAnswers = saved.userAnswers;
   currentIndex = saved.currentIndex || 0;
@@ -5139,6 +5144,12 @@ function resumeProgress(saved) {
 // BLOCK 1500: 퀴즈 시작 (원본 B013 + 백그라운드 로딩)
 // ========================================================================
 async function startQuizWithNumber(uiStartNumber) {
+  if (isTrialUser_()) {
+    uiStartNumber = 1;
+    if (DOM.startNumberInput) DOM.startNumberInput.value = '1';
+    if (DOM.setSelector) DOM.setSelector.value = '1';
+    showToast('FREE TRIAL uses questions 1-20. Upgrade for Full Access.', 'info', 3500);
+  }
   if (isNaN(uiStartNumber) || uiStartNumber < 1) uiStartNumber = 1;
   
   if (uiStartNumber > TOTAL_QUESTIONS) {
@@ -5484,7 +5495,7 @@ export {
 // ========================================================================
 // BLOCK 9999: 시스템 시작 로그
 // ========================================================================
-console.log("✅ SAT Digital Quiz System v8.0B Modes Loaded!");
+console.log("✅ GongBoo Learning System v8.0D Loaded!");
 console.log("✅ Chart Engine v6.2: line series.data/categories + axis min/max/tick/suffix 지원");
 console.log("📋 원본 B001~B015 완전 복구 + v4.0.0 최적화 병합");
 console.log("✅ renderGraphic() 800+ 줄 완전 복구");

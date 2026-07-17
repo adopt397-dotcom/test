@@ -1400,9 +1400,28 @@ body:not(.content-protected) textarea {
 <!-- 1. MathJax -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.js"></script>
 
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var banner = document.getElementById('accessBanner');
+  if (!banner) return;
+  try {
+    var user = JSON.parse(localStorage.getItem('quiz_current_user_v1') || 'null');
+    if (!user) return;
+    var isAdmin = String(user.account_type || '').toLowerCase() === 'admin';
+    var isTrial = !isAdmin && (user.is_sample || String(user.access_level || '').toLowerCase() === 'trial');
+    banner.textContent = isAdmin
+      ? 'ADMIN ACCESS · All subjects and all questions'
+      : isTrial
+        ? 'FREE TRIAL · Questions 1-20 · Upgrade for Full Access'
+        : 'FULL ACCESS';
+    banner.style.display = 'block';
+  } catch (error) {}
+});
+</script>
+
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0C13-ADMIN-SAMPLE20';
+import { initialize } from './main.js?v=8.0D-TRIAL-FULL-ADMIN';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
@@ -1496,7 +1515,7 @@ document.addEventListener('DOMContentLoaded', () => {
       id="chatbotResponse" 
       style="margin-top:10px;padding:18px;background:#f8f9fa;border-radius:16px;min-height:70px;white-space:pre-wrap;border-left:4px solid #f5a623;font-size:15px;line-height:1.6;color:#1a1a2e;"
     >
-      💡 Ask anything about this SAT question.
+      💡 Ask anything about the current question.
     </div>
   </div>
 </div>
@@ -1562,7 +1581,7 @@ document.addEventListener('DOMContentLoaded', () => {
           context: (typeof window.getCurrentQuestionContext === 'function')
             ? window.getCurrentQuestionContext()
             : null,
-          schemaVersion: 'SAT_MULTILANG_V2'
+          schemaVersion: 'GONGBOO_UNIVERSAL_V1'
         })
       });
 
@@ -1573,7 +1592,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         responseDiv.innerHTML =
           '❌ Error: ' + (data.error || data.message || 'Unknown error') +
-          '<br><small>HTTP ' + res.status + ' · SAT_MULTILANG_V2</small>';
+          '<br><small>HTTP ' + res.status + ' · GONGBOO_UNIVERSAL_V1</small>';
       }
     } catch (e) {
       responseDiv.innerHTML = '❌ Network error: Could not reach server.';

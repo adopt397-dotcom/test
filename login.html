@@ -42,6 +42,17 @@
             font-weight: 500;
             margin-bottom: 28px;
         }
+        .trial-notice {
+            margin: -12px 0 22px;
+            padding: 12px 14px;
+            border: 1px solid #F5A623;
+            border-radius: 10px;
+            background: #FFF8EB;
+            text-align: center;
+            color: #744210;
+        }
+        .trial-notice strong { display:block; font-size:14px; letter-spacing:.4px; }
+        .trial-notice span { display:block; margin-top:3px; font-size:12px; color:#975A16; }
         .tabs {
             display: flex;
             gap: 6px;
@@ -192,10 +203,14 @@
     <div class="container">
         <h1>GongBoo.org</h1>
         <p class="subtitle">Member Service</p>
+        <div class="trial-notice">
+            <strong>FREE TRIAL</strong>
+            <span>20 questions per subject. Upgrade for Full Access.</span>
+        </div>
 
         <!-- 탭 메뉴 -->
         <div class="tabs">
-            
+            <button class="tab-btn active" data-tab="loginTab">Login</button>
             <button class="tab-btn" data-tab="signupTab">Sign Up</button>
             <button class="tab-btn" data-tab="changeTab">Change Password</button>
         </div>
@@ -336,7 +351,7 @@
             const params = new URLSearchParams(location.search);
             if (params.get('signup') === 'success') {
                 const email = params.get('email') || '';
-                showResult('loginResult', '✅ Registration completed. Log in now to try 20 sample questions in every subject.', true);
+                showResult('loginResult', '✅ Registration completed. Your FREE TRIAL includes questions 1-20 in every subject. Upgrade for Full Access.', true);
                 document.getElementById('loginEmail').value = email;
                 // URL 정리 (뒤로 가기 시 파라미터 제거)
                 if (window.history && window.history.replaceState) {
@@ -371,13 +386,12 @@
                     localStorage.setItem('quiz_current_user_v1', JSON.stringify(user));
                     localStorage.setItem('quiz_available_subjects_v1', JSON.stringify(subjects));
                     showResult('loginResult', user.is_sample
-                        ? '🎁 Welcome! Choose any subject and try 20 sample questions.'
+                        ? '🎁 FREE TRIAL: Choose any subject and use questions 1-20. Upgrade for Full Access.'
                         : '✅ Welcome, ' + (user.name || email) + '!', true);
                     renderSubjectPicker(subjects);
                 } else {
                     let msg = data.message;
-                    if (data.status === 'pending') msg = '⏳ ' + msg;
-                    else if (data.status === 'expired') msg = '⏰ ' + msg;
+                    if (data.status === 'expired') msg = '⏰ ' + msg;
                     else if (data.status === 'none') msg = '💳 ' + msg;
                     showResult('loginResult', '❌ ' + msg, false);
                 }
@@ -403,12 +417,12 @@
                 const meta = document.createElement('span');
                 meta.className = 'subject-meta';
                 meta.textContent = subject.SAMPLE
-                    ? (subject.CATEGORY || 'QUIZ') + ' · FREE SAMPLE · 20 questions'
+                    ? (subject.CATEGORY || 'QUIZ') + ' · FREE TRIAL · Questions 1-20'
                     : (subject.CATEGORY || 'QUIZ') + ' · ' + Number(subject.SET_SIZE || 120) + ' questions per set';
                 button.appendChild(meta);
                 button.addEventListener('click', () => {
                     localStorage.setItem('quiz_current_subject_v1', JSON.stringify(subject));
-                    window.location.href = './index.html?v=8.0C13-ADMIN-SAMPLE20';
+                    window.location.href = './index.html?v=8.0D-TRIAL-FULL-ADMIN';
                 });
                 list.appendChild(button);
             });
