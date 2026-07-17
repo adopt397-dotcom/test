@@ -1,21 +1,16 @@
 <script>
-(function gongbooDirectAccessGuard() {
+(function () {
   try {
-    var user = JSON.parse(localStorage.getItem('quiz_current_user_v1') || 'null');
-    var subject = JSON.parse(localStorage.getItem('quiz_current_subject_v1') || 'null');
-    if (!user || typeof user !== 'object' || !String(user.email || '').trim() || !subject || !subject.CODE || !subject.SHEET) {
-      document.documentElement.style.display = 'none';
-      window.location.replace('./login.html?v=8.0D');
+    const user = JSON.parse(localStorage.getItem('quiz_current_user_v1') || 'null');
+    if (String(user?.account_type || '').trim().toLowerCase() === 'admin') {
+      document.documentElement.classList.add('admin-user');
     }
-  } catch (error) {
-    document.documentElement.style.display = 'none';
-    localStorage.removeItem('quiz_current_user_v1');
-    localStorage.removeItem('quiz_available_subjects_v1');
-    localStorage.removeItem('quiz_current_subject_v1');
-    window.location.replace('./login.html?v=8.0D');
+  } catch (e) {
+    console.warn('Admin copy mode check failed:', e);
   }
 })();
 </script>
+
 <!-- ============================================================ -->
 <!-- BLOCK 01: 외부 라이브러리 (CDN) -->
 <!-- ============================================================ -->
@@ -1161,12 +1156,24 @@
     }
   }
 
-/* ===== 공통 ===== */
- * {
+/* ===== 복사 방지: 일반 회원만 적용 / admin은 복사 허용 ===== */
+html:not(.admin-user) body * {
+  -webkit-user-select: none !important;
   user-select: none !important;
 }
-::selection {
+html:not(.admin-user) body ::selection {
   background: transparent !important;
+}
+
+/* 관리자 계정: 텍스트 선택·복사 허용 */
+html.admin-user body,
+html.admin-user body * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+html.admin-user body ::selection {
+  background: Highlight !important;
+  color: HighlightText !important;
 }
 
   /* v7.1.1 bilingual display */
@@ -1401,14 +1408,6 @@
   #calculatorToggle,#calculatorPanel,.quiz-tools{display:none!important}#timerToggle{display:flex!important;visibility:visible!important;opacity:1!important}.persistent-timer-toggle{position:fixed;top:12px;right:max(12px,calc((100vw - 900px)/2 + 18px));z-index:100}@media(min-width:821px){#timerPanel{position:fixed;top:62px;right:max(12px,calc((100vw - 900px)/2 + 18px));left:auto;bottom:auto}}@media(max-width:820px){.persistent-timer-toggle{top:12px;right:12px}}
 </style>
 
-<style>
-html.admin-user, html.admin-user body, html.admin-user * {
-  -webkit-user-select: text !important;
-  user-select: text !important;
-}
-html.trial-user #startNumber { opacity:.85; cursor:not-allowed; }
-</style>
-
 <!-- ============================================================ -->
 <!-- BLOCK 07: JavaScript 로드 및 실행 -->
 <!-- ============================================================ -->
@@ -1418,7 +1417,7 @@ html.trial-user #startNumber { opacity:.85; cursor:not-allowed; }
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0D';
+import { initialize } from './main.js?v=8.0C12-TIMER12';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
