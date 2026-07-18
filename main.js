@@ -155,11 +155,12 @@ function isTrialUser(user) {
   return user.is_trial === true || normalizeRoleValue(user.payment_status) === 'p';
 }
 
-function clearAuthAndRedirect() {
+function clearAuthAndRedirect(reason) {
   localStorage.removeItem('quiz_current_user_v1');
   localStorage.removeItem('quiz_available_subjects_v1');
   localStorage.removeItem('quiz_current_subject_v1');
-  window.location.replace('./login.html?v=8.0D');
+  var authReason = String(reason || '').replace(/[^A-Z0-9_\-]/gi, '').slice(0, 40);
+  window.location.replace('./login.html?v=8.0D' + (authReason ? '&auth_error=' + encodeURIComponent(authReason) : ''));
 }
 
 function applyUserRolePolicy() {
@@ -203,7 +204,7 @@ function getSessionToken_() {
 async function fetchQuizApi_(params, signal) {
   var token = getSessionToken_();
   if (!token) {
-    clearAuthAndRedirect();
+    clearAuthAndRedirect('TOKEN_MISSING');
     throw new Error('Please log in again.');
   }
   var body = {};
@@ -220,7 +221,7 @@ async function fetchQuizApi_(params, signal) {
 function throwQuizApiError_(data, fallbackMessage) {
   var code = String(data && data.code || '');
   if (code.indexOf('AUTH_') === 0) {
-    clearAuthAndRedirect();
+    clearAuthAndRedirect(code);
   }
   throw new Error(data && data.message ? data.message : fallbackMessage);
 }
@@ -248,13 +249,13 @@ function applySubjectConfig() {
     subjectConfig = null;
   }
   if (!hasValidCurrentUser(currentUser)) {
-    clearAuthAndRedirect();
+    clearAuthAndRedirect('LOGIN_DATA_MISSING');
     return false;
   }
   applyUserRolePolicy();
   applyCopyProtectionPolicy();
   if (!subjectConfig || !subjectConfig.CODE || !subjectConfig.SHEET) {
-    window.location.replace('./login.html?v=8.0D');
+    clearAuthAndRedirect('SUBJECT_DATA_MISSING');
     return false;
   }
   currentSubject = String(subjectConfig.CODE).trim().toUpperCase();
