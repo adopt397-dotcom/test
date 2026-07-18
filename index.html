@@ -156,6 +156,7 @@
       <div class="progress-bar-container">
         <div class="progress-bar" id="quizProgressBar"></div>
       </div>
+      <div class="account-identity" id="accountIdentity"></div>
     </div>
 
     <!-- 문제 콘텐츠 -->
@@ -570,6 +571,15 @@
     border-radius: 10px;
     height: 10px;
     transition: width .3s
+  }
+  .account-identity {
+    width: 100%;
+    margin-top: 7px;
+    text-align: right;
+    color: #2c3e50;
+    font-size: .88rem;
+    font-weight: 700;
+    line-height: 1.25;
   }
   .review-banner {
     background: #e67e22;
@@ -1417,7 +1427,7 @@ html.admin-user body ::selection {
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.0C12-TIMER12';
+import { initialize } from './main.js?v=8.0D-ACCOUNT-SAMPLE1';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();

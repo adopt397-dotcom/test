@@ -159,7 +159,8 @@ function clearAuthAndRedirect(reason) {
   localStorage.removeItem('quiz_current_user_v1');
   localStorage.removeItem('quiz_available_subjects_v1');
   localStorage.removeItem('quiz_current_subject_v1');
-  var authReason = String(reason || '').replace(/[^A-Z0-9_\-]/gi, '').slice(0, 40);
+  var rawReason = String(reason || '').replace(/[^A-Z0-9_\-]/gi, '').slice(0, 40);
+  var authReason = rawReason.indexOf('AUTH_') === 0 ? 'LOGIN_REQUIRED' : rawReason;
   window.location.replace('./login.html?v=8.0D' + (authReason ? '&auth_error=' + encodeURIComponent(authReason) : ''));
 }
 
@@ -266,7 +267,6 @@ function applySubjectConfig() {
   };
   DATA_SHEET = sheetAliases[DATA_SHEET.toUpperCase()] || DATA_SHEET.toLowerCase();
   QUESTIONS_PER_SET = Math.max(1, parseInt(subjectConfig.SET_SIZE, 10) || 120);
-  if (IS_TRIAL_USER) QUESTIONS_PER_SET = TRIAL_LIMIT;
   TOTAL_QUESTIONS = Math.max(0, parseInt(subjectConfig.QUESTION_COUNT, 10) || 0);
   var keyPart = currentSubject.replace(/[^A-Z0-9_-]/g, '_');
   STORAGE_KEY = 'quiz_progress_main_v8_0D_' + keyPart;
@@ -282,8 +282,8 @@ function applySubjectConfig() {
 function updateSubjectTitle(setNumber) {
   var title = document.querySelector('.sat-title');
   var subtitle = document.querySelector('.sat-sub');
-  if (title) title.textContent = String(subjectConfig.NAME || currentSubject) + ' · Set ' + (setNumber || 1);
-  if (subtitle) subtitle.textContent = String(subjectConfig.CATEGORY || 'QUIZ');
+  if (title) title.textContent = String(subjectConfig.NAME || currentSubject) + (IS_TRIAL_USER ? ' · SAMPLE' : ' · Set ' + (setNumber || 1));
+  if (subtitle) subtitle.textContent = IS_TRIAL_USER ? 'Questions 1-20' : String(subjectConfig.CATEGORY || 'QUIZ');
 }
 
 // ========================================================================
@@ -597,6 +597,7 @@ DOM.startQuizBtn = null;
 DOM.maxNumberSpan = null;
 DOM.progressText = null;
 DOM.quizProgressBar = null;
+DOM.accountIdentity = null;
 DOM.questionContainer = null;
 DOM.explanationBox = null;
 DOM.explanationText = null;
@@ -665,6 +666,7 @@ function initDOM() {
     DOM.maxNumberSpan = document.getElementById('maxNumber');
     DOM.progressText = document.getElementById('progressText');
     DOM.quizProgressBar = document.getElementById('quizProgressBar');
+    DOM.accountIdentity = document.getElementById('accountIdentity');
     DOM.questionContainer = document.getElementById('questionContainer');
     DOM.explanationBox = document.getElementById('explanationBox');
     DOM.explanationText = document.getElementById('explanationText');
@@ -1217,14 +1219,22 @@ function updateSetSelector() {
   while (setSelector.options.length > 0) {
     setSelector.remove(0);
   }
-  var totalQuestions = TOTAL_QUESTIONS > 0 ? TOTAL_QUESTIONS : 360;
+  var configuredTotal = Math.max(0, parseInt(subjectConfig && subjectConfig.QUESTION_COUNT, 10) || 0);
+  var totalQuestions = configuredTotal || (TOTAL_QUESTIONS > 0 ? TOTAL_QUESTIONS : 360);
   var totalSets = Math.ceil(totalQuestions / QUESTIONS_PER_SET);
+  if (IS_TRIAL_USER) {
+    var sampleOption = document.createElement('option');
+    sampleOption.value = 'sample';
+    sampleOption.textContent = 'SAMPLE (Questions 1-20)';
+    setSelector.appendChild(sampleOption);
+  }
   for (var i = 1; i <= totalSets; i++) {
     var start = (i - 1) * QUESTIONS_PER_SET + 1;
     var end = Math.min(i * QUESTIONS_PER_SET, totalQuestions);
     var option = document.createElement('option');
     option.value = i;
-    option.textContent = 'Set ' + i + ' (Questions ' + start + '-' + end + ')';
+    option.textContent = (IS_TRIAL_USER ? '🔒 ' : '') + 'Set ' + i + ' (Questions ' + start + '-' + end + ')';
+    option.disabled = IS_TRIAL_USER;
     setSelector.appendChild(option);
   }
   var maxStartNumber = Math.max(1, totalQuestions - QUESTIONS_PER_SET + 1);
@@ -1236,11 +1246,23 @@ function updateSetSelector() {
     DOM.startNumberInput.max = maxStartNumber;
   }
   if (setSelector.options.length > 0) {
-    setSelector.value = '1';
+    setSelector.value = IS_TRIAL_USER ? 'sample' : '1';
   }
   if (DOM.startNumberInput) {
     DOM.startNumberInput.value = '1';
   }
+  var setHint = document.querySelector('.card-new .card-hint');
+  if (setHint) {
+    setHint.textContent = IS_TRIAL_USER
+      ? 'SAMPLE is available now. Locked sets require account approval.'
+      : 'Select a set or enter a number';
+  }
+}
+
+function renderAccountIdentity_() {
+  if (!DOM.accountIdentity) return;
+  var email = String(currentUser && currentUser.email || '').trim();
+  DOM.accountIdentity.textContent = email ? 'Account: ' + email : '';
 }
 
 // ========================================================================
@@ -1342,7 +1364,7 @@ async function load50Questions(uiStartNumber, retryCount = 0) {
           uiStartNumber = TRIAL_START;
           currentStartNumber = TRIAL_START;
           if (DOM.startNumberInput) DOM.startNumberInput.value = String(TRIAL_START);
-          if (DOM.setSelector) DOM.setSelector.value = '1';
+          if (DOM.setSelector) DOM.setSelector.value = 'sample';
         }
         requestParams.set('start', String(requestedStart));
         requestParams.set('limit', String(requestedLimit));
@@ -5198,7 +5220,7 @@ async function startQuizWithNumber(uiStartNumber) {
   if (IS_TRIAL_USER) {
     uiStartNumber = TRIAL_START;
     if (DOM.startNumberInput) DOM.startNumberInput.value = String(TRIAL_START);
-    if (DOM.setSelector) DOM.setSelector.value = '1';
+    if (DOM.setSelector) DOM.setSelector.value = 'sample';
   }
   if (isNaN(uiStartNumber) || uiStartNumber < 1) uiStartNumber = 1;
   
@@ -5225,7 +5247,7 @@ async function startQuizWithNumber(uiStartNumber) {
     }
   }
   
-  var overlay = showLoadingOverlay('Loading ' + QUESTIONS_PER_SET + ' questions from ' + startNum + '...');
+  var overlay = showLoadingOverlay('Loading ' + (IS_TRIAL_USER ? TRIAL_LIMIT : QUESTIONS_PER_SET) + ' questions from ' + startNum + '...');
   try {
     var questions = await load50Questions(startNum);
     if (questions.length === 0) throw new Error('No question data received');
@@ -5275,6 +5297,7 @@ function initialize() {
   console.log('🔧 initialize() started');
   
   initDOM();
+  renderAccountIdentity_();
   updateSubjectTitle(1);
   initLanguageSelector();
   initModeSelector();
@@ -5314,7 +5337,7 @@ function initialize() {
       if (DOM.setSelector) {
         DOM.setSelector.addEventListener('change', function() {
           var setNum = IS_TRIAL_USER ? 1 : parseInt(this.value);
-          if (IS_TRIAL_USER) this.value = '1';
+          if (IS_TRIAL_USER) this.value = 'sample';
           if (!isNaN(setNum) && setNum >= 1) {
             var startNum = (setNum - 1) * QUESTIONS_PER_SET + 1;
             DOM.startNumberInput.value = startNum;
@@ -5323,7 +5346,7 @@ function initialize() {
           }
         });
         if (DOM.setSelector.options.length > 0) {
-          DOM.setSelector.value = '1';
+          DOM.setSelector.value = IS_TRIAL_USER ? 'sample' : '1';
           DOM.startNumberInput.value = '';
         }
       }

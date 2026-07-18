@@ -152,16 +152,14 @@ function verifyAccessToken_(token) {
 
   let payload;
   try {
-    payload = JSON.parse(
-      Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[0])).getDataAsString(Utilities.Charset.UTF_8)
-    );
+    payload = JSON.parse(decodeURIComponent(parts[0]));
   } catch (error) {
     throwPublicError_('AUTH_INVALID', 'Please log in again.');
   }
 
   const now = Math.floor(Date.now() / 1000);
   if (!payload || !payload.email || !payload.exp || payload.exp <= now) {
-    throwPublicError_('AUTH_EXPIRED', 'Your login has expired. Please log in again.');
+    throwPublicError_('AUTH_INVALID', 'Please log in again.');
   }
 
   payload.status = cleanText_(payload.status).toLowerCase();
