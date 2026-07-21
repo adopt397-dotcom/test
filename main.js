@@ -98,8 +98,6 @@ var LANG = {
 // ========================================================================
 var API_URL = "https://script.google.com/macros/s/AKfycbz-sdtluP0KW1yPqhaQ8tDluEOR0x_6O2gAcZwagnP37cmkQJkWJmqpe2p0TdK-P75O/exec";
 var ORIGINAL_API_URL = API_URL;
-// /test only. Production /gongboo must keep this disabled.
-var TEST_MODE = true;
 // BLOCK 1000: Multi Subject Global State
 var currentUser = null;
 var currentSubject = '';
@@ -144,14 +142,12 @@ function normalizeRoleValue(value) {
 }
 
 function hasValidCurrentUser(user) {
-  if (TEST_MODE && user && user.account_type === 'test_admin') return true;
   return !!(user && typeof user === 'object' &&
     String(user.email || '').trim() && String(user.session_token || '').trim());
 }
 
 function isAdminUser(user) {
-  var role = normalizeRoleValue(user && user.account_type);
-  return role === 'admin' || (TEST_MODE && role === 'test_admin');
+  return normalizeRoleValue(user && user.account_type) === 'admin';
 }
 
 function isTrialUser(user) {
@@ -165,11 +161,6 @@ function clearAuthAndRedirect(reason) {
   localStorage.removeItem('quiz_current_subject_v1');
   var rawReason = String(reason || '').replace(/[^A-Z0-9_\-]/gi, '').slice(0, 40);
   var authReason = rawReason.indexOf('AUTH_') === 0 ? 'LOGIN_REQUIRED' : rawReason;
-  if (TEST_MODE) {
-    console.warn('Test session reset:', authReason || reason || 'unknown');
-    window.location.replace('./index.html?v=8.1-test');
-    return;
-  }
   window.location.replace('./login.html?v=8.0D' + (authReason ? '&auth_error=' + encodeURIComponent(authReason) : ''));
 }
 
@@ -213,13 +204,13 @@ function getSessionToken_() {
 
 async function fetchQuizApi_(params, signal) {
   var token = getSessionToken_();
-  if (!TEST_MODE && !token) {
+  if (!token) {
     clearAuthAndRedirect('TOKEN_MISSING');
     throw new Error('Please log in again.');
   }
   var body = {};
   params.forEach(function(value, key) { body[key] = value; });
-  if (token) body.session_token = token;
+  body.session_token = token;
   return fetch(ORIGINAL_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -248,45 +239,6 @@ function isTrialProgressSafe(saved) {
 }
 
 // BLOCK 3000: Subject Management
-async function bootstrapTestEnvironment_() {
-  if (!TEST_MODE) return;
-  var response = await fetch(ORIGINAL_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'subjects' })
-  });
-  var data = await response.json();
-  if (!response.ok || !data || data.status !== 'success' || !Array.isArray(data.subjects)) {
-    throw new Error(data && data.message ? data.message : 'Could not load test subjects.');
-  }
-  if (!data.subjects.length) {
-    throw new Error('No question sheets were found. Add a sheet with a supported header row.');
-  }
-
-  availableSubjects = data.subjects;
-  currentUser = {
-    name: 'TEST MODE',
-    email: 'test@gongboo.local',
-    account_type: 'test_admin',
-    payment_status: 'a',
-    access_level: 'test'
-  };
-
-  var savedSubject = null;
-  try {
-    savedSubject = JSON.parse(localStorage.getItem('quiz_current_subject_v1') || 'null');
-  } catch (error) {
-    savedSubject = null;
-  }
-  subjectConfig = availableSubjects.find(function(subject) {
-    return savedSubject && String(subject.SHEET).toLowerCase() === String(savedSubject.SHEET).toLowerCase();
-  }) || availableSubjects[0];
-
-  localStorage.setItem('quiz_current_user_v1', JSON.stringify(currentUser));
-  localStorage.setItem('quiz_available_subjects_v1', JSON.stringify(availableSubjects));
-  localStorage.setItem('quiz_current_subject_v1', JSON.stringify(subjectConfig));
-}
-
 function applySubjectConfig() {
   try {
     currentUser = JSON.parse(localStorage.getItem('quiz_current_user_v1') || 'null');
@@ -316,7 +268,7 @@ function applySubjectConfig() {
   DATA_SHEET = sheetAliases[DATA_SHEET.toUpperCase()] || DATA_SHEET.toLowerCase();
   QUESTIONS_PER_SET = Math.max(1, parseInt(subjectConfig.SET_SIZE, 10) || 120);
   TOTAL_QUESTIONS = Math.max(0, parseInt(subjectConfig.QUESTION_COUNT, 10) || 0);
-  var keyPart = encodeURIComponent(currentSubject).replace(/%/g, '_');
+  var keyPart = currentSubject.replace(/[^A-Z0-9_-]/g, '_');
   STORAGE_KEY = 'quiz_progress_main_v8_0D_' + keyPart;
   TOTAL_CACHE_KEY = 'quiz_total_questions_v8_0D_' + keyPart;
   window.currentUser = currentUser;
@@ -1305,28 +1257,6 @@ function updateSetSelector() {
       ? 'SAMPLE is available now. Locked sets require account approval.'
       : 'Select a set or enter a number';
   }
-}
-
-function initTestSubjectSelector_() {
-  if (!TEST_MODE) return;
-  var selector = document.getElementById('testSubjectSelector');
-  if (!selector) return;
-  selector.innerHTML = '';
-  availableSubjects.forEach(function(subject) {
-    var option = document.createElement('option');
-    option.value = subject.SHEET;
-    option.textContent = (subject.NAME || subject.CODE) + ' (' + Number(subject.QUESTION_COUNT || 0) + ')';
-    option.selected = String(subject.SHEET).toLowerCase() === String(DATA_SHEET).toLowerCase();
-    selector.appendChild(option);
-  });
-  selector.addEventListener('change', function() {
-    var selected = availableSubjects.find(function(subject) {
-      return String(subject.SHEET).toLowerCase() === String(selector.value).toLowerCase();
-    });
-    if (!selected) return;
-    localStorage.setItem('quiz_current_subject_v1', JSON.stringify(selected));
-    window.location.reload();
-  });
 }
 
 function renderAccountIdentity_() {
@@ -5362,113 +5292,11 @@ async function startQuizWithNumber(uiStartNumber) {
 // ========================================================================
 // BLOCK 1510: 시스템 초기화 (원본 B012 initialize)
 // ========================================================================
-// BLOCK 1490: /test JSON graphic and Math/LaTeX preview
-function initTestPreviewTool_() {
-  if (!TEST_MODE || window.__gongbooTestPreviewInstalled) return;
-  var panel = document.getElementById('testPreviewPanel');
-  var toggle = document.getElementById('testPreviewToggle');
-  var close = document.getElementById('testPreviewClose');
-  var graphicInput = document.getElementById('testGraphicInput');
-  var graphicOutput = document.getElementById('testGraphicOutput');
-  var graphicStatus = document.getElementById('testGraphicStatus');
-  var mathInput = document.getElementById('testMathInput');
-  var mathOutput = document.getElementById('testMathOutput');
-  var mathStatus = document.getElementById('testMathStatus');
-  if (!panel || !toggle) return;
-  window.__gongbooTestPreviewInstalled = true;
-
-  function setPanel(open) {
-    panel.hidden = !open;
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  }
-
-  function renderGraphicPreview() {
-    var raw = String(graphicInput && graphicInput.value || '').trim();
-    if (!raw) {
-      graphicOutput.innerHTML = '<div class="test-preview-empty">Paste the Google Sheet G value here.</div>';
-      graphicStatus.textContent = 'Waiting for JSON.';
-      graphicStatus.className = 'test-preview-status';
-      return;
-    }
-    try {
-      var parsed = parseGraphicPayload(raw);
-      if (!parsed) throw new Error('Invalid JSON or unsupported empty value.');
-      if (!parsed.type) throw new Error('Required field "type" is missing.');
-      var rendered = renderGraphic(parsed);
-      if (!rendered) throw new Error('The graphic engine returned no output.');
-      graphicOutput.innerHTML = rendered;
-      graphicStatus.textContent = 'OK · type: ' + String(parsed.type);
-      graphicStatus.className = 'test-preview-status success';
-    } catch (error) {
-      graphicStatus.textContent = 'Error · ' + (error && error.message ? error.message : String(error));
-      graphicStatus.className = 'test-preview-status error';
-    }
-  }
-
-  async function renderMathPreview() {
-    var raw = String(mathInput && mathInput.value || '').trim();
-    if (!raw) {
-      mathOutput.innerHTML = '<div class="test-preview-empty">Paste a question, choice, or explanation here.</div>';
-      mathStatus.textContent = 'Waiting for math text.';
-      mathStatus.className = 'test-preview-status';
-      return;
-    }
-    try {
-      mathOutput.innerHTML = renderWithEditingMarks(raw, true);
-      await ensureMathJax();
-      if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
-        if (typeof window.MathJax.typesetClear === 'function') window.MathJax.typesetClear([mathOutput]);
-        await window.MathJax.typesetPromise([mathOutput]);
-      }
-      mathStatus.textContent = 'OK · rendered with the quiz Math/LaTeX pipeline.';
-      mathStatus.className = 'test-preview-status success';
-    } catch (error) {
-      mathStatus.textContent = 'Error · ' + (error && error.message ? error.message : String(error));
-      mathStatus.className = 'test-preview-status error';
-    }
-  }
-
-  toggle.addEventListener('click', function() { setPanel(panel.hidden); });
-  if (close) close.addEventListener('click', function() { setPanel(false); });
-  document.getElementById('testGraphicRender').addEventListener('click', renderGraphicPreview);
-  document.getElementById('testGraphicFormat').addEventListener('click', function() {
-    try {
-      var parsed = parseGraphicPayload(graphicInput.value);
-      if (!parsed) throw new Error('JSON could not be parsed.');
-      graphicInput.value = JSON.stringify(parsed, null, 2);
-      renderGraphicPreview();
-    } catch (error) {
-      graphicStatus.textContent = 'Error · ' + error.message;
-      graphicStatus.className = 'test-preview-status error';
-    }
-  });
-  document.getElementById('testGraphicClear').addEventListener('click', function() {
-    graphicInput.value = '';
-    renderGraphicPreview();
-  });
-  document.getElementById('testMathRender').addEventListener('click', renderMathPreview);
-  document.getElementById('testMathClear').addEventListener('click', function() {
-    mathInput.value = '';
-    renderMathPreview();
-  });
-}
-
-async function initialize() {
-  if (TEST_MODE) {
-    try {
-      await bootstrapTestEnvironment_();
-    } catch (error) {
-      console.error('Test bootstrap error:', error);
-      showSplashError(error.message || 'Could not start test mode.');
-      return;
-    }
-  }
+function initialize() {
   if (!applySubjectConfig()) return;
   console.log('🔧 initialize() started');
   
   initDOM();
-  initTestSubjectSelector_();
-  initTestPreviewTool_();
   renderAccountIdentity_();
   updateSubjectTitle(1);
   initLanguageSelector();
