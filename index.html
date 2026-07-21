@@ -49,7 +49,7 @@
       <span class="sat-badge">Practice</span>
     </div>
     <div class="sat-sub">Reading &amp; Writing · Math</div>
-    <div class="test-subject-picker" aria-label="Test subject selector">
+    <div class="test-subject-picker test-subject-picker-header" aria-label="Test subject selector">
       <label for="testSubjectSelector">TEST SUBJECT</label>
       <select id="testSubjectSelector"><option>Loading subjects...</option></select>
     </div>
@@ -251,7 +251,7 @@
   </div>
 </section>
 <style>
-  .test-subject-picker{display:flex;align-items:center;justify-content:center;gap:8px;margin:10px auto 0;flex-wrap:wrap}.test-subject-picker label{font-size:11px;font-weight:800;letter-spacing:.08em;color:#dbeafe}.test-subject-picker select{max-width:320px;padding:8px 32px 8px 11px;border:1px solid rgba(255,255,255,.45);border-radius:9px;background:#fff;color:#172033;font-weight:700}
+  .test-subject-picker{position:fixed;left:14px;top:14px;z-index:1002;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 28px);padding:8px 10px;border:1px solid rgba(37,99,235,.25);border-radius:10px;background:#fff;color:#172033;box-shadow:0 8px 24px rgba(15,23,42,.18)}.test-subject-picker label{font-size:11px;font-weight:800;letter-spacing:.08em;color:#2563eb;white-space:nowrap}.test-subject-picker select{max-width:min(320px,calc(100vw - 150px));padding:8px 32px 8px 11px;border:1px solid #94a3b8;border-radius:8px;background:#fff;color:#172033;font-weight:800}
   .test-preview-toggle{position:fixed;left:14px;bottom:14px;z-index:1001;border:0;border-radius:999px;padding:11px 16px;background:#7c3aed;color:#fff;font-weight:800;box-shadow:0 8px 26px rgba(30,20,60,.35);cursor:pointer}.test-preview-toggle:hover{background:#6d28d9}.test-preview-panel{position:fixed;inset:20px;z-index:1100;overflow:auto;padding:18px;background:#eef2ff;border:2px solid #7c3aed;border-radius:18px;box-shadow:0 22px 70px rgba(15,23,42,.5);color:#172033}.test-preview-panel[hidden]{display:none!important}.test-preview-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}.test-preview-head>div{display:grid;gap:3px}.test-preview-head small{color:#64748b}.test-preview-head button{margin-left:auto;width:38px;height:38px;border:0;border-radius:10px;background:#e2e8f0;font-size:27px;cursor:pointer}.test-preview-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}.test-preview-card{min-width:0;padding:16px;background:#fff;border:1px solid #cbd5e1;border-radius:14px}.test-preview-card h3{margin:0 0 10px}.test-preview-card textarea{width:100%;min-height:190px;box-sizing:border-box;resize:vertical;padding:12px;border:1px solid #94a3b8;border-radius:10px;background:#0f172a;color:#e2e8f0;font:13px/1.55 ui-monospace,Consolas,monospace;tab-size:2}.test-preview-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.test-preview-actions button{border:0;border-radius:8px;padding:9px 13px;background:#2563eb;color:#fff;font-weight:750;cursor:pointer}.test-preview-actions button:last-child{background:#64748b}.test-preview-status{min-height:20px;margin:7px 0;color:#64748b;font-size:13px}.test-preview-status.success{color:#15803d;font-weight:700}.test-preview-status.error{color:#b91c1c;font-weight:700}.test-preview-output{min-height:220px;overflow:auto;padding:12px;border:1px dashed #94a3b8;border-radius:10px;background:#fff}.test-preview-empty{display:grid;min-height:180px;place-items:center;color:#94a3b8;text-align:center}@media(max-width:850px){.test-preview-panel{inset:8px;padding:11px}.test-preview-grid{grid-template-columns:1fr}.test-preview-toggle{left:8px;bottom:8px}.test-preview-card textarea{min-height:150px}}
 </style>
 
@@ -1463,7 +1463,7 @@ html.admin-user body ::selection {
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.1-test-preview1';
+import { initialize } from './main.js?v=8.1-test-preview2';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
