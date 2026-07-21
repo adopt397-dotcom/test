@@ -5301,6 +5301,7 @@ function initialize() {
   updateSubjectTitle(1);
   initLanguageSelector();
   initModeSelector();
+  initAdminPreviewTool();
   initTimer();
   attachEvents();
 
@@ -5425,6 +5426,114 @@ function previewGraphic(graphicData) {
     host.innerHTML = renderGraphic(graphicData);
     host.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return hostId;
+}
+
+// ========================================================================
+// BLOCK 1595: Admin on-page JSON and LaTeX preview
+// ========================================================================
+function initAdminPreviewTool() {
+    if (!IS_ADMIN_USER || window.__gongbooAdminPreviewInstalled) return;
+    var toggle = document.getElementById('adminPreviewToggle');
+    var panel = document.getElementById('adminPreviewPanel');
+    if (!toggle || !panel) return;
+    window.__gongbooAdminPreviewInstalled = true;
+
+    var closeBtn = document.getElementById('adminPreviewClose');
+    var graphicInput = document.getElementById('adminGraphicInput');
+    var graphicOutput = document.getElementById('adminGraphicOutput');
+    var graphicStatus = document.getElementById('adminGraphicStatus');
+    var mathInput = document.getElementById('adminMathInput');
+    var mathOutput = document.getElementById('adminMathOutput');
+    var mathStatus = document.getElementById('adminMathStatus');
+
+    toggle.hidden = false;
+
+    function setStatus(el, text, state) {
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'admin-preview-status' + (state ? ' ' + state : '');
+    }
+
+    function openPanel() {
+        panel.hidden = false;
+        toggle.setAttribute('aria-expanded', 'true');
+    }
+
+    function closePanel() {
+        panel.hidden = true;
+        toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    function renderGraphicPreview() {
+        if (!graphicInput || !graphicOutput) return;
+        var value = graphicInput.value.trim();
+        if (!value) {
+            graphicOutput.innerHTML = '<div class="admin-preview-empty">Graphic output appears here.</div>';
+            setStatus(graphicStatus, 'Waiting for JSON.', '');
+            return;
+        }
+        try {
+            var html = renderGraphic(value);
+            if (!html) throw new Error('No renderable graphic payload.');
+            graphicOutput.innerHTML = html;
+            setStatus(graphicStatus, 'Rendered.', 'success');
+        } catch (error) {
+            graphicOutput.innerHTML = '<div class="admin-preview-empty">Render failed.</div>';
+            setStatus(graphicStatus, error.message || 'Graphic render failed.', 'error');
+        }
+    }
+
+    async function renderMathPreview() {
+        if (!mathInput || !mathOutput) return;
+        var value = mathInput.value.trim();
+        if (!value) {
+            mathOutput.innerHTML = '<div class="admin-preview-empty">Math output appears here.</div>';
+            setStatus(mathStatus, 'Waiting for math text.', '');
+            return;
+        }
+        try {
+            mathOutput.innerHTML = renderWithEditingMarks(value, true);
+            await ensureMathJax();
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                await window.MathJax.typesetPromise([mathOutput]);
+            }
+            setStatus(mathStatus, 'Rendered.', 'success');
+        } catch (error) {
+            mathOutput.textContent = value;
+            setStatus(mathStatus, error.message || 'Math render failed.', 'error');
+        }
+    }
+
+    toggle.addEventListener('click', function() {
+        panel.hidden ? openPanel() : closePanel();
+    });
+    if (closeBtn) closeBtn.addEventListener('click', closePanel);
+    var graphicRenderBtn = document.getElementById('adminGraphicRender');
+    var graphicFormatBtn = document.getElementById('adminGraphicFormat');
+    var graphicClearBtn = document.getElementById('adminGraphicClear');
+    var mathRenderBtn = document.getElementById('adminMathRender');
+    var mathClearBtn = document.getElementById('adminMathClear');
+    if (graphicRenderBtn) graphicRenderBtn.addEventListener('click', renderGraphicPreview);
+    if (graphicFormatBtn) graphicFormatBtn.addEventListener('click', function() {
+        if (!graphicInput) return;
+        try {
+            var parsed = parseGraphicPayload(graphicInput.value);
+            if (!parsed) throw new Error('Invalid graphic JSON.');
+            graphicInput.value = JSON.stringify(parsed, null, 2);
+            renderGraphicPreview();
+        } catch (error) {
+            setStatus(graphicStatus, error.message || 'Format failed.', 'error');
+        }
+    });
+    if (graphicClearBtn) graphicClearBtn.addEventListener('click', function() {
+        if (graphicInput) graphicInput.value = '';
+        renderGraphicPreview();
+    });
+    if (mathRenderBtn) mathRenderBtn.addEventListener('click', renderMathPreview);
+    if (mathClearBtn) mathClearBtn.addEventListener('click', function() {
+        if (mathInput) mathInput.value = '';
+        renderMathPreview();
+    });
 }
 
 // ========================================================================

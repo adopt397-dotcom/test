@@ -49,10 +49,6 @@
       <span class="sat-badge">Practice</span>
     </div>
     <div class="sat-sub">Reading &amp; Writing · Math</div>
-    <div class="test-subject-picker" aria-label="Test subject selector">
-      <label for="testSubjectSelector">TEST SUBJECT</label>
-      <select id="testSubjectSelector"><option>Loading subjects...</option></select>
-    </div>
     <div class="language-switcher" aria-label="Language selector">
       <label for="languageSelector">Language</label>
       <select id="languageSelector">
@@ -226,34 +222,37 @@
 </div>
 <!-- ===== BLOCK 04 END ===== -->
 
-<!-- BLOCK 05: /test JSON Graphic and Math/LaTeX Preview -->
-<button type="button" id="testPreviewToggle" class="test-preview-toggle" aria-controls="testPreviewPanel" aria-expanded="false">🧪 JSON · LaTeX Preview</button>
-<section id="testPreviewPanel" class="test-preview-panel" aria-label="JSON graphic and Math preview" hidden>
-  <div class="test-preview-head">
-    <div><strong>TEST PREVIEW LAB</strong><small>Uses the same graphic and math engine as the quiz.</small></div>
-    <button type="button" id="testPreviewClose" aria-label="Close preview">×</button>
+<!-- ===== BLOCK 05: Admin JSON Graphic and Math Preview ===== -->
+<button type="button" id="adminPreviewToggle" class="admin-preview-toggle" aria-controls="adminPreviewPanel" aria-expanded="false" hidden>JSON / LaTeX Preview</button>
+<section id="adminPreviewPanel" class="admin-preview-panel" aria-label="Admin JSON graphic and math preview" hidden>
+  <div class="admin-preview-head">
+    <div><strong>ADMIN PREVIEW</strong><small>Same quiz graphic and math renderer</small></div>
+    <button type="button" id="adminPreviewClose" aria-label="Close preview">x</button>
   </div>
-  <div class="test-preview-grid">
-    <article class="test-preview-card">
+  <div class="admin-preview-grid">
+    <article class="admin-preview-card">
       <h3>JSON Graphic</h3>
-      <textarea id="testGraphicInput" spellcheck="false" placeholder="Paste the Google Sheet G value here"></textarea>
-      <div class="test-preview-actions"><button type="button" id="testGraphicRender">Render</button><button type="button" id="testGraphicFormat">Format JSON</button><button type="button" id="testGraphicClear">Clear</button></div>
-      <div id="testGraphicStatus" class="test-preview-status">Waiting for JSON.</div>
-      <div id="testGraphicOutput" class="test-preview-output"><div class="test-preview-empty">Graphic output appears here.</div></div>
+      <textarea id="adminGraphicInput" spellcheck="false" placeholder="Paste the Google Sheet G value here"></textarea>
+      <div class="admin-preview-actions">
+        <button type="button" id="adminGraphicRender">Render</button>
+        <button type="button" id="adminGraphicFormat">Format JSON</button>
+        <button type="button" id="adminGraphicClear">Clear</button>
+      </div>
+      <div id="adminGraphicStatus" class="admin-preview-status">Waiting for JSON.</div>
+      <div id="adminGraphicOutput" class="admin-preview-output"><div class="admin-preview-empty">Graphic output appears here.</div></div>
     </article>
-    <article class="test-preview-card">
+    <article class="admin-preview-card">
       <h3>Math / LaTeX</h3>
-      <textarea id="testMathInput" spellcheck="false" placeholder="Paste a question, choice, explanation, or LaTeX expression here"></textarea>
-      <div class="test-preview-actions"><button type="button" id="testMathRender">Render</button><button type="button" id="testMathClear">Clear</button></div>
-      <div id="testMathStatus" class="test-preview-status">Waiting for math text.</div>
-      <div id="testMathOutput" class="test-preview-output"><div class="test-preview-empty">Math output appears here.</div></div>
+      <textarea id="adminMathInput" spellcheck="false" placeholder="Paste a question, choice, explanation, or LaTeX expression here"></textarea>
+      <div class="admin-preview-actions">
+        <button type="button" id="adminMathRender">Render</button>
+        <button type="button" id="adminMathClear">Clear</button>
+      </div>
+      <div id="adminMathStatus" class="admin-preview-status">Waiting for math text.</div>
+      <div id="adminMathOutput" class="admin-preview-output"><div class="admin-preview-empty">Math output appears here.</div></div>
     </article>
   </div>
 </section>
-<style>
-  .test-subject-picker{display:flex;align-items:center;justify-content:center;gap:8px;margin:10px auto 0;flex-wrap:wrap}.test-subject-picker label{font-size:11px;font-weight:800;letter-spacing:.08em;color:#dbeafe}.test-subject-picker select{max-width:320px;padding:8px 32px 8px 11px;border:1px solid rgba(255,255,255,.45);border-radius:9px;background:#fff;color:#172033;font-weight:700}
-  .test-preview-toggle{position:fixed;left:14px;bottom:14px;z-index:1001;border:0;border-radius:999px;padding:11px 16px;background:#7c3aed;color:#fff;font-weight:800;box-shadow:0 8px 26px rgba(30,20,60,.35);cursor:pointer}.test-preview-toggle:hover{background:#6d28d9}.test-preview-panel{position:fixed;inset:20px;z-index:1100;overflow:auto;padding:18px;background:#eef2ff;border:2px solid #7c3aed;border-radius:18px;box-shadow:0 22px 70px rgba(15,23,42,.5);color:#172033}.test-preview-panel[hidden]{display:none!important}.test-preview-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}.test-preview-head>div{display:grid;gap:3px}.test-preview-head small{color:#64748b}.test-preview-head button{margin-left:auto;width:38px;height:38px;border:0;border-radius:10px;background:#e2e8f0;font-size:27px;cursor:pointer}.test-preview-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}.test-preview-card{min-width:0;padding:16px;background:#fff;border:1px solid #cbd5e1;border-radius:14px}.test-preview-card h3{margin:0 0 10px}.test-preview-card textarea{width:100%;min-height:190px;box-sizing:border-box;resize:vertical;padding:12px;border:1px solid #94a3b8;border-radius:10px;background:#0f172a;color:#e2e8f0;font:13px/1.55 ui-monospace,Consolas,monospace;tab-size:2}.test-preview-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.test-preview-actions button{border:0;border-radius:8px;padding:9px 13px;background:#2563eb;color:#fff;font-weight:750;cursor:pointer}.test-preview-actions button:last-child{background:#64748b}.test-preview-status{min-height:20px;margin:7px 0;color:#64748b;font-size:13px}.test-preview-status.success{color:#15803d;font-weight:700}.test-preview-status.error{color:#b91c1c;font-weight:700}.test-preview-output{min-height:220px;overflow:auto;padding:12px;border:1px dashed #94a3b8;border-radius:10px;background:#fff}.test-preview-empty{display:grid;min-height:180px;place-items:center;color:#94a3b8;text-align:center}@media(max-width:850px){.test-preview-panel{inset:8px;padding:11px}.test-preview-grid{grid-template-columns:1fr}.test-preview-toggle{left:8px;bottom:8px}.test-preview-card textarea{min-height:150px}}
-</style>
 
 <!-- ============================================================ -->
 <!-- BLOCK 06: CSS 스타일 (공통) -->
@@ -1222,6 +1221,157 @@ html.admin-user body ::selection {
   color: HighlightText !important;
 }
 
+html:not(.admin-user) .admin-preview-toggle,
+html:not(.admin-user) .admin-preview-panel {
+  display: none !important;
+}
+.admin-preview-toggle {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1001;
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 16px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 8px 26px rgba(15,23,42,.28);
+  cursor: pointer;
+}
+.admin-preview-toggle:hover {
+  background: #1d4ed8;
+}
+.admin-preview-panel {
+  position: fixed;
+  inset: 20px;
+  z-index: 1100;
+  overflow: auto;
+  padding: 18px;
+  background: #f8fafc;
+  border: 2px solid #2563eb;
+  border-radius: 14px;
+  box-shadow: 0 22px 70px rgba(15,23,42,.45);
+  color: #172033;
+}
+.admin-preview-panel[hidden] {
+  display: none !important;
+}
+.admin-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.admin-preview-head > div {
+  display: grid;
+  gap: 3px;
+}
+.admin-preview-head small {
+  color: #64748b;
+}
+.admin-preview-head button {
+  margin-left: auto;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: #e2e8f0;
+  font-size: 22px;
+  cursor: pointer;
+}
+.admin-preview-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  gap: 16px;
+}
+.admin-preview-card {
+  min-width: 0;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+.admin-preview-card h3 {
+  margin: 0 0 10px;
+}
+.admin-preview-card textarea {
+  width: 100%;
+  min-height: 190px;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font: 13px/1.55 Consolas, "Courier New", monospace;
+  tab-size: 2;
+}
+.admin-preview-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.admin-preview-actions button {
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 13px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 750;
+  cursor: pointer;
+}
+.admin-preview-actions button:last-child {
+  background: #64748b;
+}
+.admin-preview-status {
+  min-height: 20px;
+  margin: 7px 0;
+  color: #64748b;
+  font-size: 13px;
+}
+.admin-preview-status.success {
+  color: #15803d;
+  font-weight: 700;
+}
+.admin-preview-status.error {
+  color: #b91c1c;
+  font-weight: 700;
+}
+.admin-preview-output {
+  min-height: 220px;
+  overflow: auto;
+  padding: 12px;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  background: #fff;
+}
+.admin-preview-empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  color: #94a3b8;
+  text-align: center;
+}
+@media(max-width:850px) {
+  .admin-preview-panel {
+    inset: 8px;
+    padding: 11px;
+  }
+  .admin-preview-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-preview-toggle {
+    right: 8px;
+    bottom: 8px;
+  }
+  .admin-preview-card textarea {
+    min-height: 150px;
+  }
+}
+
   /* v7.1.1 bilingual display */
   .bilingual-block{display:flex;flex-direction:column;gap:10px}
   .language-line-en{color:#172033}
@@ -1463,7 +1613,7 @@ html.admin-user body ::selection {
 
 <!-- 2. GitHub main.js 불러오기 + 초기화 -->
 <script type="module">
-import { initialize } from './main.js?v=8.3-test-preview1';
+import { initialize } from './main.js?v=8.5-admin-preview1';
 
 document.addEventListener('DOMContentLoaded', () => {
   initialize();
