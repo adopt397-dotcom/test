@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GongBoo Super Graphic Viewer</title>
+  <style>
+    :root{color-scheme:light;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#152238;background:#edf2f7}
+    *{box-sizing:border-box}body{margin:0}.viewer-head{padding:18px 22px;background:#0a1628;color:#fff;border-bottom:3px solid #f5a623}.viewer-head h1{margin:0;font-size:20px}.viewer-head p{margin:5px 0 0;color:#cbd5e1;font-size:13px}.viewer-grid{display:grid;grid-template-columns:minmax(240px,1fr) minmax(300px,1.2fr) minmax(300px,1fr);gap:14px;padding:14px;min-height:calc(100vh - 93px)}.panel{display:flex;flex-direction:column;min-width:0;background:#fff;border:1px solid #dbe3ee;border-radius:12px;box-shadow:0 4px 16px rgba(15,23,42,.08);overflow:hidden}.panel-head{padding:12px 14px;border-bottom:1px solid #e5e7eb;font-weight:750;font-size:14px}.panel-body{padding:14px;min-height:0}.image-stage{display:grid;place-items:center;min-height:340px;background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px}.image-stage img{max-width:100%;max-height:58vh;object-fit:contain}.muted{color:#64748b;font-size:13px;text-align:center}.controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.controls button,.controls label{border:0;border-radius:7px;padding:8px 10px;background:#1d4ed8;color:#fff;font:600 13px system-ui;cursor:pointer}.controls button.secondary,.controls label.secondary{background:#e2e8f0;color:#1e293b}.controls button.warn{background:#b45309}.controls button:disabled{opacity:.5;cursor:not-allowed}.controls input[type=file]{display:none}textarea{width:100%;flex:1;min-height:380px;resize:vertical;border:1px solid #cbd5e1;border-radius:8px;padding:11px;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;color:#0f172a;background:#fbfdff}.status{padding:9px 10px;border-radius:7px;font-size:13px;line-height:1.4}.status.info{background:#eff6ff;color:#1d4ed8}.status.success{background:#ecfdf5;color:#047857}.status.warning{background:#fffbeb;color:#92400e}.status.error{background:#fef2f2;color:#b91c1c}.issues{margin:10px 0 0;padding-left:18px;font-size:12px}.issues code{color:#b91c1c}.viewer-host{min-height:340px}.endpoint{display:flex;gap:7px;margin-top:10px}.endpoint input{min-width:0;flex:1;border:1px solid #cbd5e1;border-radius:7px;padding:8px;font-size:12px}@media(max-width:1000px){.viewer-grid{grid-template-columns:1fr 1fr}.panel.render-panel{grid-column:1/-1}}@media(max-width:680px){.viewer-grid{grid-template-columns:1fr}.panel.render-panel{grid-column:auto}}
+  </style>
+</head>
+<body>
+  <header class="viewer-head"><h1>GongBoo Super Graphic Viewer</h1><p>Image → Super JSON → Validator → Renderer. Final G-cell data contains JSON only.</p></header>
+  <main class="viewer-grid">
+    <section class="panel">
+      <div class="panel-head">1. Source image</div>
+      <div class="panel-body">
+        <div id="imageStage" class="image-stage"><span class="muted">Paste a screenshot with Ctrl+V, or choose a source image.<br>It is used for review only and is never embedded in JSON.</span></div>
+        <div class="controls"><label for="imageInput">Choose image<input id="imageInput" type="file" accept="image/*"></label><button id="clearImage" class="secondary" type="button">Clear</button></div>
+        <div class="endpoint"><input id="aiEndpoint" type="url" value="https://sat-bot-07020143.vercel.app/api/graphic-to-json" placeholder="Authorized image-to-JSON endpoint"><button id="generateJson" class="warn" type="button">Generate JSON</button></div>
+        <p class="muted">Generate JSON is enabled only when an authorized analysis endpoint is configured. Manual JSON review works without one.</p>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head">2. Super JSON</div>
+      <div class="panel-body" style="display:flex;flex-direction:column">
+        <textarea id="jsonInput" spellcheck="false" aria-label="Super JSON input">{
+  "engine": "super",
+  "schemaVersion": "1.0",
+  "type": "calculus.regionBetweenCurves",
+  "data": {
+    "coordinateSystem": { "xRange": [-1, 3], "yRange": [-1, 5] },
+    "curves": [
+      { "id": "f", "expression": "x^2" },
+      { "id": "g", "expression": "2*x" }
+    ],
+    "region": { "upper": "g", "lower": "f", "xRange": [0, 2] }
+  }
+}</textarea>
+        <div class="controls"><button id="renderJson" type="button">Validate & Render</button><button id="formatJson" class="secondary" type="button">Format</button><button id="copyJson" class="secondary" type="button">Copy compact JSON</button></div>
+        <div id="jsonStatus" class="status info">Ready for Super JSON.</div>
+        <ul id="issues" class="issues"></ul>
+      </div>
+    </section>
+    <section class="panel render-panel">
+      <div class="panel-head">3. Renderer result</div>
+      <div class="panel-body"><div id="viewerHost" class="viewer-host"></div></div>
+    </section>
+  </main>
+  <script type="module" src="./viewer.js"></script>
+</body>
+</html>
