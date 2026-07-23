@@ -7,6 +7,10 @@ const viewerHost = document.getElementById('viewerHost');
 const status = document.getElementById('jsonStatus');
 const issues = document.getElementById('issues');
 const endpoint = document.getElementById('aiEndpoint');
+const conversionMode = document.getElementById('conversionMode');
+const panelCount = document.getElementById('panelCount');
+const strictMode = document.getElementById('strictMode');
+const conversionNotes = document.getElementById('conversionNotes');
 let sourceImageDataUrl = '';
 
 function setStatus(message, kind) {
@@ -128,11 +132,19 @@ document.getElementById('generateJson').addEventListener('click', async function
   if (!url) { setStatus('Configure an authorized image-to-JSON endpoint before generation.', 'warning'); return; }
   setStatus('Requesting Super JSON analysis…', 'info');
   try {
-    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageDataUrl: sourceImageDataUrl, outputSchema: 'gongboo-super-graphic-v1' }) });
+    const conversion = {
+      mode: conversionMode.value,
+      panelCount: panelCount.value,
+      strict: strictMode.checked,
+      preserve: Array.from(document.querySelectorAll('.preserve-option:checked')).map(function(input) { return input.value; }),
+      notes: conversionNotes.value.trim()
+    };
+    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageDataUrl: sourceImageDataUrl, outputSchema: 'gongboo-super-graphic-v1', conversion: conversion }) });
     if (!response.ok) throw new Error('Analysis request failed: ' + response.status);
     const result = await response.json();
     if (!result.success) throw new Error(result.error || 'Image-to-JSON generation failed.');
     if (!result.json) {
+      jsonInput.value = '';
       viewerHost.innerHTML = '';
       showIssues({ warnings: (result.warnings || []).map(function(message) { return { code: result.status || 'UNSUPPORTED', message: message }; }) });
       setStatus('Conversion status: ' + (result.status || 'UNSUPPORTED') + '. Use manual JSON or a clearer image.', 'warning');
