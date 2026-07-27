@@ -159,6 +159,99 @@ const TEMPLATES = {
       { type: 'face', points: [[0, 0, 0], [3, 0, 0], [1, 3, 2]], attributes: { color: '#34d399', opacity: 0.45 } },
       { type: 'point', position: [1, 3, 2], name: 'P', attributes: { color: '#111827' } }
     ] })
+  },
+  calculus_trigonometric: {
+    label: 'Calculus: sine and cosine',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-1, 3, 7, -3], grid: true }, objects: [
+      { type: 'functiongraph', expression: '2*sin(x)', range: [0, 6.283185307179586], attributes: { strokeColor: '#2563eb' } },
+      { type: 'functiongraph', expression: '2*cos(x)', range: [0, 6.283185307179586], attributes: { strokeColor: '#dc2626', dash: 2 } },
+      { type: 'text', position: [3.8, 2.5], text: '2 sin x   and   2 cos x' }
+    ] })
+  },
+  calculus_exponential_log: {
+    label: 'Calculus: exponential and logarithm',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-3, 5, 5, -3], grid: true }, objects: [
+      { type: 'functiongraph', expression: 'exp(x)', range: [-2, 1.6], attributes: { strokeColor: '#2563eb' } },
+      { type: 'functiongraph', expression: 'log(x)', range: [0.08, 4.5], attributes: { strokeColor: '#059669' } },
+      { type: 'line', y: 0, attributes: { strokeColor: '#111827' } },
+      { type: 'text', position: [1.7, 4.2], text: 'eˣ and ln x' }
+    ] })
+  },
+  calculus_rational_asymptote: {
+    label: 'Calculus: rational function and asymptotes',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-5, 5, 5, -5], grid: true }, objects: [
+      { type: 'functiongraph', expression: '1/(x-1)+1', range: [-5, 0.92], attributes: { strokeColor: '#2563eb' } },
+      { type: 'functiongraph', expression: '1/(x-1)+1', range: [1.08, 5], attributes: { strokeColor: '#2563eb' } },
+      { type: 'line', x: 1, attributes: { strokeColor: '#64748b', dash: 2 } },
+      { type: 'line', y: 1, attributes: { strokeColor: '#64748b', dash: 2 } }
+    ] })
+  },
+  calculus_limit_hole: {
+    label: 'Calculus: limit with removable hole',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-3, 4, 4, -3], grid: true }, objects: [
+      { type: 'functiongraph', expression: 'x+1', range: [-3, 4], attributes: { strokeColor: '#2563eb' } },
+      { type: 'point', coords: [1, 2], name: '', attributes: { strokeColor: '#2563eb' }, marker: 'open' },
+      { type: 'point', coords: [1, -1], name: 'f(1)', attributes: { fillColor: '#dc2626', strokeColor: '#dc2626' } },
+      { type: 'text', position: [1.25, 2.25], text: 'limit = 2' }
+    ] })
+  },
+  calculus_derivative_pair: {
+    label: 'Calculus: f and f prime',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-3, 5, 4, -4], grid: true }, objects: [
+      { type: 'functiongraph', expression: 'x^3/3-x', range: [-2.4, 2.4], attributes: { strokeColor: '#2563eb' } },
+      { type: 'functiongraph', expression: 'x^2-1', range: [-2.4, 2.4], attributes: { strokeColor: '#dc2626', dash: 2 } },
+      { type: 'text', position: [1.6, 3.8], text: 'f(x)' }, { type: 'text', position: [1.7, 1.7], text: "f'(x)" }
+    ] })
+  },
+  calculus_ellipse_parametric: {
+    label: 'Calculus: ellipse parametric',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-4, 4, 4, -4], grid: true }, objects: [
+      { type: 'parametric', xExpression: '3*cos(t)', yExpression: '2*sin(t)', range: [0, 6.283185307179586], attributes: { strokeColor: '#7c3aed' } },
+      { type: 'segment', from: [0, 0], to: [3, 0], attributes: { strokeColor: '#64748b', dash: 2 } }
+    ] })
+  },
+  geometry_unit_circle: {
+    label: '2D: unit circle and angle',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-2, 2, 2, -2], grid: true }, objects: [
+      { type: 'circle', center: [0, 0], radius: 1, attributes: { strokeColor: '#2563eb' } },
+      { type: 'segment', from: [0, 0], to: [0.5, 0.8660254], attributes: { strokeColor: '#dc2626' } },
+      { type: 'point', coords: [0.5, 0.8660254], name: '(1/2, √3/2)', attributes: { fillColor: '#111827' } },
+      { type: 'text', position: [0.15, 0.32], text: 'π/3' }
+    ] })
+  },
+  geometry_vector_components: {
+    label: '2D: vector components',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-1, 5, 6, -1], grid: true }, objects: [
+      { type: 'arrow', from: [0, 0], to: [4, 3], attributes: { strokeColor: '#2563eb' } },
+      { type: 'segment', from: [4, 0], to: [4, 3], attributes: { strokeColor: '#64748b', dash: 2 } },
+      { type: 'segment', from: [0, 0], to: [4, 0], attributes: { strokeColor: '#64748b', dash: 2 } },
+      { type: 'text', position: [2, 1.8], text: 'v = ⟨4, 3⟩' }
+    ] })
+  },
+  three3d_sphere: {
+    label: '3D: sphere',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'sphere', center: [0, 0, 0], radius: 2, attributes: { color: '#60a5fa', opacity: 0.48 } },
+      { type: 'point', position: [0, 2, 0], name: 'r = 2', attributes: { color: '#111827' } }
+    ] })
+  },
+  three3d_square_pyramid: {
+    label: '3D: square pyramid',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'face', points: [[-1.5, 0, -1.5], [1.5, 0, -1.5], [1.5, 0, 1.5], [-1.5, 0, 1.5]], attributes: { color: '#94a3b8', opacity: 0.35 } },
+      { type: 'face', points: [[-1.5, 0, -1.5], [1.5, 0, -1.5], [0, 3, 0]], attributes: { color: '#a78bfa', opacity: 0.42 } },
+      { type: 'face', points: [[1.5, 0, -1.5], [1.5, 0, 1.5], [0, 3, 0]], attributes: { color: '#a78bfa', opacity: 0.42 } },
+      { type: 'face', points: [[1.5, 0, 1.5], [-1.5, 0, 1.5], [0, 3, 0]], attributes: { color: '#a78bfa', opacity: 0.42 } },
+      { type: 'face', points: [[-1.5, 0, 1.5], [-1.5, 0, -1.5], [0, 3, 0]], attributes: { color: '#a78bfa', opacity: 0.42 } }
+    ] })
+  },
+  three3d_line_and_plane: {
+    label: '3D: line and plane',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'face', points: [[-2, 0, -2], [2, 0, -2], [2, 0, 2], [-2, 0, 2]], attributes: { color: '#60a5fa', opacity: 0.3 } },
+      { type: 'segment', from: [-2, 3, -1], to: [2, -2, 1], attributes: { color: '#dc2626' } },
+      { type: 'point', position: [0.4, 0, 0.2], name: 'intersection', attributes: { color: '#111827' } }
+    ] })
   }
 };
 

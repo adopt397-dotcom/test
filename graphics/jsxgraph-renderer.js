@@ -44,7 +44,7 @@ function mountScene(host, scene) {
   items.forEach(item => {
     const style = attributes(item.style);
     if (item.type === 'point' && Array.isArray(item.position)) {
-      const p = board.create('point', item.position, Object.assign(style, { name: item.label || '', size: item.marker === 'none' ? 0 : 2, fillColor: style.strokeColor }));
+      const p = board.create('point', item.position, Object.assign(style, { name: item.label || '', size: item.marker === 'none' ? 0 : 2, fillColor: item.marker === 'open' ? '#ffffff' : (style.fillColor === 'none' ? style.strokeColor : style.fillColor) }));
       if (item.id) points[item.id] = p;
     }
   });
