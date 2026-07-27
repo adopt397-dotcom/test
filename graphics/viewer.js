@@ -48,7 +48,7 @@ function parseJson() {
 }
 
 function loadThree3dModule() {
-  if (!three3dModule) three3dModule = import('./g3scene.js');
+  if (!three3dModule) three3dModule = import('./g3scene.js?v=335dfa6');
   return three3dModule;
 }
 

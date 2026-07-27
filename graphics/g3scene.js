@@ -1,4 +1,4 @@
-import * as THREE from './three.module.js';
+import * as THREE from './three.module.js?v=8f45f37';
 
 const COLORS = { x: 0xdc2626, y: 0x059669, z: 0x2563eb, object: 0x2563eb };
 
