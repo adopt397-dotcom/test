@@ -42,10 +42,21 @@ function normalizeCatalog(catalog, fallbackSource) {
     title: item.title || item.sourcePath || 'Unnamed source item',
     sourcePath: item.sourcePath || '',
     sourceUrl: item.sourceUrl || '',
-    category: item.category || 'unclassified',
+    category: subjectCategory(item) || item.category || 'unclassified',
     dimension: item.dimension || '2d',
     format: item.format || 'source',
   }));
+}
+
+// Preserve the official category when this is not clearly school-science material.
+// A path/title match must be specific enough to avoid classifying generic 3D demos as chemistry.
+function subjectCategory(item) {
+  const text = `${item.title || ''} ${item.sourcePath || ''}`.toLowerCase();
+  const chemistry = /(?:molecules?|molecular|chemical|chemistry|crystal|lattice|atomic|atoms?|orbitals?|electrons?|covalent|ionic|isotopes?|compounds?|reaction)/;
+  const physics = /(?:physics|mechanics?|projectile|pendulum|springs?|gravity|electromagnet|magnetic|electric(?:ity|_field|_circuit)?|optics?|thermodynamic|fluids?|pressure|velocity|acceleration|force[_ -]?field)/;
+  if (chemistry.test(text)) return 'Chemistry';
+  if (physics.test(text)) return 'Physics';
+  return '';
 }
 
 async function loadPool() {
@@ -90,9 +101,13 @@ function render() {
   const shown = matching.slice(0, PAGE_SIZE);
   const readyTotal = entries.filter((entry) => entry.kind === 'ready').length;
   const rawTotal = entries.length - readyTotal;
+  const physicsTotal = entries.filter((entry) => entry.category === 'Physics').length;
+  const chemistryTotal = entries.filter((entry) => entry.category === 'Chemistry').length;
   $('summary').innerHTML = [
     `<span class="pill ready">Ready JSON: ${readyTotal}</span>`,
     `<span class="pill raw">Official source reserve: ${rawTotal}</span>`,
+    `<span class="pill">Physics: ${physicsTotal}</span>`,
+    `<span class="pill">Chemistry: ${chemistryTotal}</span>`,
     `<span class="pill">Showing ${shown.length} of ${matching.length}</span>`,
   ].join('');
   $('results').innerHTML = shown.map(card).join('');
