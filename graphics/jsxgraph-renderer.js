@@ -38,7 +38,8 @@ function mountScene(host, scene) {
   const board = window.JXG.JSXGraph.initBoard(boardId, {
     boundingbox: [xRange[0], yRange[1], xRange[1], yRange[0]],
     axis: true, grid: !!coord.grid, showCopyright: false, showNavigation: false,
-    keepaspectratio: false
+    // Mathematical figures must preserve equal x/y units: circles stay circles.
+    keepaspectratio: true
   });
   const points = {};
   const curves = {};
