@@ -1,6 +1,6 @@
-[submodule "tmp/graphics-lab/reference/jsxgraph-official"]
-	path = tmp/graphics-lab/reference/jsxgraph-official
+[submodule "graphics/archive/reference/jsxgraph-official"]
+	path = graphics/archive/reference/jsxgraph-official
 	url = https://github.com/jsxgraph/jsxgraph.git
-[submodule "tmp/graphics-lab/reference/threejs-official"]
-	path = tmp/graphics-lab/reference/threejs-official
+[submodule "graphics/archive/reference/threejs-official"]
+	path = graphics/archive/reference/threejs-official
 	url = https://github.com/mrdoob/three.js.git

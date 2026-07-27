@@ -1,4 +1,4 @@
-import { createTemplate, listTemplates } from '../tmp/graphics-lab/jsxgraph-templates.js';
+import { createTemplate, listTemplates } from './jsxgraph-templates.js';
 import { mountJsxGraph, validateJsxGraphPayload } from './jsxgraph-renderer.js';
 
 const $ = (id) => document.getElementById(id);
