@@ -228,6 +228,112 @@ const TEMPLATES = {
       { type: 'text', position: [2, 1.8], text: 'v = ⟨4, 3⟩' }
     ] })
   },
+  calculus_absolute_value: {
+    label: 'Calculus: absolute value and corners',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-4, 5, 4, -3], grid: true }, objects: [
+      { type: 'functiongraph', expression: 'abs(x)-1', range: [-4, 4], attributes: { strokeColor: '#2563eb' } },
+      { type: 'point', coords: [0, -1], name: 'corner', attributes: { fillColor: '#111827' } },
+      { type: 'text', position: [-3.5, 4.1], text: 'f(x) = |x| - 1' }
+    ] })
+  },
+  calculus_cubic_inflection: {
+    label: 'Calculus: cubic and inflection point',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-3, 5, 3, -5], grid: true }, objects: [
+      { type: 'functiongraph', expression: 'x^3-x', range: [-2, 2], attributes: { strokeColor: '#2563eb' } },
+      { type: 'point', coords: [0, 0], name: 'inflection', attributes: { fillColor: '#dc2626' } },
+      { type: 'line', x: 0, attributes: { strokeColor: '#94a3b8', dash: 2 } }
+    ] })
+  },
+  calculus_logistic: {
+    label: 'Calculus: logistic growth',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-6, 1.3, 6, -0.3], grid: true }, objects: [
+      { type: 'functiongraph', expression: '1/(1+exp(-x))', range: [-6, 6], attributes: { strokeColor: '#2563eb' } },
+      { type: 'line', y: 1, attributes: { strokeColor: '#94a3b8', dash: 2 } },
+      { type: 'point', coords: [0, 0.5], name: 'P', attributes: { fillColor: '#111827' } }
+    ] })
+  },
+  calculus_inverse_trig: {
+    label: 'Calculus: inverse tangent',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-6, 2.4, 6, -2.4], grid: true }, objects: [
+      { type: 'functiongraph', expression: 'atan(x)', range: [-6, 6], attributes: { strokeColor: '#2563eb' } },
+      { type: 'line', y: 'pi/2', attributes: { strokeColor: '#94a3b8', dash: 2 } },
+      { type: 'line', y: '-pi/2', attributes: { strokeColor: '#94a3b8', dash: 2 } }
+    ] })
+  },
+  calculus_discontinuity: {
+    label: 'Calculus: jump discontinuity',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-4, 4, 4, -3], grid: true }, objects: [
+      { type: 'functiongraph', expression: 'x+1', range: [-4, 0], attributes: { strokeColor: '#2563eb' } },
+      { type: 'functiongraph', expression: 'x-1', range: [0, 4], attributes: { strokeColor: '#2563eb' } },
+      { type: 'point', coords: [0, 1], name: '', marker: 'open', attributes: { strokeColor: '#2563eb' } },
+      { type: 'point', coords: [0, -1], name: 'f(0)', attributes: { fillColor: '#dc2626', strokeColor: '#dc2626' } }
+    ] })
+  },
+  calculus_cardioid: {
+    label: 'Calculus: polar cardioid',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-1, 4, 4, -4], grid: true }, objects: [
+      { type: 'polar', rExpression: '1+cos(t)', range: [0, 6.283185307179586], attributes: { strokeColor: '#7c3aed' } },
+      { type: 'text', position: [-0.7, 3.4], text: 'r = 1 + cos t' }
+    ] })
+  },
+  calculus_spiral: {
+    label: 'Calculus: polar spiral',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-5, 5, 5, -5], grid: true }, objects: [
+      { type: 'polar', rExpression: 't/4', range: [0, 12.566370614359172], attributes: { strokeColor: '#0f766e' } },
+      { type: 'text', position: [-4.5, 4.2], text: 'r = theta / 4' }
+    ] })
+  },
+  geometry_parabola_focus: {
+    label: '2D: parabola with focus and directrix',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-4, 5, 4, -3], grid: true }, objects: [
+      { type: 'functiongraph', expression: 'x^2/4', range: [-4, 4], attributes: { strokeColor: '#2563eb' } },
+      { type: 'point', coords: [0, 1], name: 'F', attributes: { fillColor: '#dc2626' } },
+      { type: 'line', y: -1, attributes: { strokeColor: '#64748b', dash: 2 } },
+      { type: 'text', position: [1.8, -1.3], text: 'directrix' }
+    ] })
+  },
+  geometry_concentric_circles: {
+    label: '2D: concentric circles and annulus',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-4, 4, 4, -4], grid: true }, objects: [
+      { type: 'circle', center: [0, 0], radius: 3, attributes: { strokeColor: '#2563eb' } },
+      { type: 'circle', center: [0, 0], radius: 1.5, attributes: { strokeColor: '#2563eb' } },
+      { type: 'point', coords: [0, 0], name: 'O', attributes: { fillColor: '#111827' } }
+    ] })
+  },
+  geometry_triangle_altitude: {
+    label: '2D: triangle with altitude',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-1, 5, 7, -1], grid: true }, objects: [
+      { type: 'polygon', points: [[0, 0], [6, 0], [2, 4]], attributes: { strokeColor: '#2563eb', fillOpacity: 0 } },
+      { type: 'segment', from: [2, 4], to: [2, 0], attributes: { strokeColor: '#dc2626', dash: 2 } },
+      { type: 'point', coords: [2, 0], name: 'H', attributes: { fillColor: '#dc2626' } }
+    ] })
+  },
+  three3d_tetrahedron: {
+    label: '3D: tetrahedron',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'face', points: [[-1.5, 0, -1], [1.5, 0, -1], [0, 0, 1.7]], attributes: { color: '#94a3b8', opacity: 0.36 } },
+      { type: 'face', points: [[-1.5, 0, -1], [1.5, 0, -1], [0, 3, 0]], attributes: { color: '#60a5fa', opacity: 0.44 } },
+      { type: 'face', points: [[1.5, 0, -1], [0, 0, 1.7], [0, 3, 0]], attributes: { color: '#60a5fa', opacity: 0.44 } },
+      { type: 'face', points: [[0, 0, 1.7], [-1.5, 0, -1], [0, 3, 0]], attributes: { color: '#60a5fa', opacity: 0.44 } }
+    ] })
+  },
+  three3d_two_planes: {
+    label: '3D: intersecting planes',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'face', points: [[-3, 0, -3], [3, 0, -3], [3, 0, 3], [-3, 0, 3]], attributes: { color: '#60a5fa', opacity: 0.28 } },
+      { type: 'face', points: [[-3, -2, 0], [3, -2, 0], [3, 3, 0], [-3, 3, 0]], attributes: { color: '#f59e0b', opacity: 0.28 } },
+      { type: 'line', from: [-3, 0, 0], to: [3, 0, 0], attributes: { color: '#dc2626' } }
+    ] })
+  },
+  three3d_vector: {
+    label: '3D: vector and components',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'segment', from: [0, 0, 0], to: [3, 2, 2], attributes: { color: '#2563eb' } },
+      { type: 'segment', from: [3, 2, 2], to: [3, 0, 2], attributes: { color: '#64748b', opacity: 0.65 } },
+      { type: 'segment', from: [3, 0, 2], to: [3, 0, 0], attributes: { color: '#64748b', opacity: 0.65 } },
+      { type: 'point', position: [3, 2, 2], name: 'v = (3, 2, 2)', attributes: { color: '#111827' } }
+    ] })
+  },
   three3d_sphere: {
     label: '3D: sphere',
     build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
