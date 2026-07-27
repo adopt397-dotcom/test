@@ -32,7 +32,9 @@ function mountScene(host, scene) {
   const xRange = numberRange(coord.xRange, [-10, 10]);
   const yRange = numberRange(coord.yRange, [-10, 10]);
   const boardId = 'gongboo-jxg-' + Math.random().toString(36).slice(2);
-  host.innerHTML = '<div id="' + boardId + '" class="jxgbox gongboo-jxg-board"></div>';
+  // The quiz page does not include the old Viewer CSS. Keep dimensions on
+  // the board itself so JSXGraph never collapses to a zero-height element.
+  host.innerHTML = '<div id="' + boardId + '" class="jxgbox gongboo-jxg-board" style="width:100%;height:400px"></div>';
   const board = window.JXG.JSXGraph.initBoard(boardId, {
     boundingbox: [xRange[0], yRange[1], xRange[1], yRange[0]],
     axis: true, grid: !!coord.grid, showCopyright: false, showNavigation: false,
