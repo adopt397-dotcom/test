@@ -121,6 +121,44 @@ const TEMPLATES = {
       { type: 'regionBetweenCurves', upper: 'rate', lower: 'axis', range: [0, 3], attributes: { fillColor: '#60a5fa', fillOpacity: 0.22 } },
       { type: 'text', position: [1.2, 4.8], text: 'A(x) = ∫₀ˣ f(t) dt' }
     ] })
+  },
+  three3d_coordinate_projection: {
+    label: '3D: coordinate point and projection',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'point', position: [2, 3, 1], name: 'P(2, 3, 1)', attributes: { color: '#111827' } },
+      { type: 'segment', from: [0, 0, 0], to: [2, 3, 1], attributes: { color: '#2563eb' } },
+      { type: 'segment', from: [2, 3, 1], to: [2, 0, 1], attributes: { color: '#64748b', opacity: 0.65 } },
+      { type: 'segment', from: [2, 0, 1], to: [2, 0, 0], attributes: { color: '#64748b', opacity: 0.65 } },
+      { type: 'segment', from: [2, 0, 1], to: [0, 0, 1], attributes: { color: '#64748b', opacity: 0.65 } }
+    ] })
+  },
+  three3d_rectangular_prism: {
+    label: '3D: rectangular prism',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 5 }, objects: [
+      { type: 'box', center: [1.5, 1, 1], size: [3, 2, 2], attributes: { color: '#60a5fa', opacity: 0.48 } },
+      { type: 'point', position: [3, 2, 2], name: 'P(3, 2, 2)', attributes: { color: '#111827' } }
+    ] })
+  },
+  three3d_cylinder: {
+    label: '3D: cylinder / solid of revolution',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'cylinder', center: [0, 1.5, 0], radius: 1.4, height: 3, attributes: { color: '#60a5fa', opacity: 0.52 } },
+      { type: 'segment', from: [0, 0, 0], to: [0, 3, 0], attributes: { color: '#dc2626' } }
+    ] })
+  },
+  three3d_cone: {
+    label: '3D: cone',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'cone', center: [0, 1.8, 0], radius: 1.5, height: 3.6, attributes: { color: '#a78bfa', opacity: 0.5 } },
+      { type: 'point', position: [0, 3.6, 0], name: 'vertex', attributes: { color: '#111827' } }
+    ] })
+  },
+  three3d_plane_face: {
+    label: '3D: plane and triangular face',
+    build: () => ({ engine: 'three3d', scene: { axes: true, grid: true, axisLength: 4 }, objects: [
+      { type: 'face', points: [[0, 0, 0], [3, 0, 0], [1, 3, 2]], attributes: { color: '#34d399', opacity: 0.45 } },
+      { type: 'point', position: [1, 3, 2], name: 'P', attributes: { color: '#111827' } }
+    ] })
   }
 };
 

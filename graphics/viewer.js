@@ -2,6 +2,7 @@ import { mountSuperGraphic, validateSuperGraphic } from './super-graphic-engine.
 import { listTemplates, createTemplate } from './jsxgraph-templates.js';
 let mountJsxGraph = function() { return null; };
 let validateJsxGraphPayload = function() { return { valid: false, errors: [{ code: 'JSXGRAPH_ADAPTER_LOADING', message: 'JSXGraph adapter is still loading.' }], warnings: [] }; };
+let three3dModule;
 import('./jsxgraph-renderer.js')
   .then(function(module) { mountJsxGraph = module.mountJsxGraph; validateJsxGraphPayload = module.validateJsxGraphPayload; })
   .catch(function() { console.warn('JSXGraph adapter is unavailable; using the compatible renderer.'); });
@@ -46,13 +47,18 @@ function parseJson() {
   catch (error) { return { error: error }; }
 }
 
+function loadThree3dModule() {
+  if (!three3dModule) three3dModule = import('./three3d-renderer.js');
+  return three3dModule;
+}
+
 function initializeTemplates() {
   templateSelect.innerHTML = '<option value="">Choose a reusable template…</option>' + listTemplates().map(function(template) {
     return '<option value="' + escapeHtml(template.id) + '">' + escapeHtml(template.label) + '</option>';
   }).join('');
 }
 
-function render() {
+async function render() {
   const parsed = parseJson();
   if (parsed.error) {
     viewerHost.innerHTML = '';
@@ -60,7 +66,24 @@ function render() {
     setStatus('JSON syntax error.', 'error');
     return;
   }
-  const validation = String(parsed.value.engine || '').toLowerCase() === 'jsxgraph'
+  const engine = String(parsed.value.engine || '').toLowerCase();
+  if (engine === 'three3d') {
+    setStatus('Loading Three.js 3D renderer…', 'info');
+    try {
+      const three3d = await loadThree3dModule();
+      const validation = three3d.validateThree3dPayload(parsed.value);
+      showIssues(validation);
+      if (!validation.valid) { viewerHost.innerHTML = ''; setStatus('Validation failed. Fix the highlighted JSON fields.', 'error'); return; }
+      three3d.mountThree3d(viewerHost, parsed.value);
+      setStatus('READY — Three.js 3D rendered. Drag to rotate; use the wheel to zoom.', 'success');
+    } catch (error) {
+      viewerHost.innerHTML = '';
+      showIssues({ errors: [{ code: 'THREE3D_RENDER_FAILED', message: error.message || 'Three.js could not be loaded.' }] });
+      setStatus('3D renderer could not be loaded.', 'error');
+    }
+    return;
+  }
+  const validation = engine === 'jsxgraph'
     ? validateJsxGraphPayload(parsed.value)
     : validateSuperGraphic(parsed.value);
   showIssues(validation);
@@ -144,9 +167,10 @@ document.getElementById('formatJson').addEventListener('click', function() {
 document.getElementById('copyJson').addEventListener('click', async function() {
   const parsed = parseJson();
   if (parsed.error) { setStatus('Cannot copy invalid JSON.', 'error'); return; }
-  const validation = String(parsed.value.engine || '').toLowerCase() === 'jsxgraph'
-    ? validateJsxGraphPayload(parsed.value)
-    : validateSuperGraphic(parsed.value);
+  const engine = String(parsed.value.engine || '').toLowerCase();
+  const validation = engine === 'three3d'
+    ? (await loadThree3dModule()).validateThree3dPayload(parsed.value)
+    : (engine === 'jsxgraph' ? validateJsxGraphPayload(parsed.value) : validateSuperGraphic(parsed.value));
   if (!validation.valid) { showIssues(validation); setStatus('Fix validation errors before copying G-cell JSON.', 'error'); return; }
   try { await navigator.clipboard.writeText(JSON.stringify(parsed.value)); setStatus('Compact Super JSON copied for the G cell.', 'success'); }
   catch (_) { setStatus('Clipboard access was unavailable. Copy the formatted JSON manually.', 'warning'); }
