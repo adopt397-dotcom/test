@@ -1,0 +1,19 @@
+SUPER ENGINE UPDATE — 2026-07-26
+
+Use files only from this folder.
+
+1) GitHub repository: adopt397-dotcom/test
+   Folder: graphics
+   Replace:
+   - viewer.html
+   - viewer.js
+   - jsxgraph-renderer.js
+   - super-graphic-engine.js
+
+2) GitHub repository: adopt397-dotcom/sat-bot
+   Folder: api
+   Replace:
+   - graphic-to-json.js
+
+Vercel redeploys automatically after sat-bot is committed.
+GitHub Pages updates after test is committed.
