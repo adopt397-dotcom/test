@@ -4,6 +4,36 @@ const ALLOWED_IDENTIFIERS = new Set(['x', 'y', 'pi', 'e', 'sqrt', 'abs', 'sin', 
 
 function issue(code, path, message, detail) { return { code: code, path: path, message: message, detail: detail || '' }; }
 function range(value, fallback) { return Array.isArray(value) && value.length === 2 && Number(value[0]) < Number(value[1]) ? [Number(value[0]), Number(value[1])] : fallback.slice(); }
+function clone(value) { try { return JSON.parse(JSON.stringify(value)); } catch (_) { return value; } }
+function itemPosition(item) { return Array.isArray(item && item.position) ? item.position : (Array.isArray(item && item.coords) ? item.coords : null); }
+
+// v1.1 bridge: old AI drafts may use data.lines/circles/points directly.
+// Normalize them once so every renderer path consumes only data.items[].
+export function normalizeSuperGraphicPayload(payload) {
+  const result = clone(payload);
+  if (!result || typeof result !== 'object' || !result.data || typeof result.data !== 'object') return result;
+  if (result.type !== 'scene') return result;
+  const data = result.data;
+  if (Array.isArray(data.items)) return result;
+  const items = [];
+  (Array.isArray(data.points) ? data.points : []).forEach(function(point, index) {
+    const position = itemPosition(point);
+    if (position) items.push({ id: point.id || ('point' + index), type: 'point', position: position, label: point.label || point.name || '', style: point.style || {}, marker: point.marker });
+  });
+  (Array.isArray(data.lines) ? data.lines : []).forEach(function(line, index) {
+    const from = line.start || line.from, to = line.end || line.to;
+    if (Array.isArray(from) && Array.isArray(to)) items.push({ id: line.id || ('line' + index), type: 'segment', from: from, to: to, style: line.style || {} });
+    else items.push(Object.assign({ id: line.id || ('line' + index), type: 'line' }, line));
+  });
+  (Array.isArray(data.segments) ? data.segments : []).forEach(function(line, index) { items.push(Object.assign({ id: line.id || ('segment' + index), type: 'segment', from: line.from || line.start, to: line.to || line.end }, line)); });
+  (Array.isArray(data.circles) ? data.circles : []).forEach(function(circle, index) { items.push(Object.assign({ id: circle.id || ('circle' + index), type: 'circle', center: circle.center || [0, 0] }, circle)); });
+  (Array.isArray(data.arcs) ? data.arcs : []).forEach(function(arc, index) { items.push(Object.assign({ id: arc.id || ('arc' + index), type: 'arc' }, arc)); });
+  (Array.isArray(data.polygons) ? data.polygons : []).forEach(function(polygon, index) { items.push(Object.assign({ id: polygon.id || ('polygon' + index), type: 'polygon' }, polygon)); });
+  (Array.isArray(data.curves) ? data.curves : []).forEach(function(curve, index) { if (curve && curve.expression) items.push(Object.assign({ id: curve.id || ('curve' + index), type: 'curve' }, curve)); else if (curve && Array.isArray(curve.points)) items.push({ id: curve.id || ('polyline' + index), type: 'polyline', points: curve.points, style: curve.style || {} }); });
+  (Array.isArray(data.texts) ? data.texts : []).forEach(function(label, index) { items.push({ id: label.id || ('text' + index), type: 'text', value: label.value || label.text || '', position: label.position || label.coords || [0, 0], style: label.style || {} }); });
+  result.data = { coordinateSystem: data.coordinateSystem || {}, items: items };
+  return result;
+}
 function safeExpression(expression) {
   const value = String(expression || '').replace(/\s+/g, '');
   if (!value || /[^0-9a-zA-Z_+\-*/^().,]/.test(value)) return false;
@@ -11,6 +41,7 @@ function safeExpression(expression) {
 }
 
 export function validateSuperGraphic(payload) {
+  payload = normalizeSuperGraphicPayload(payload);
   const errors = [], warnings = [];
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return { valid: false, errors: [issue('SUPER_JSON_ROOT_INVALID', '', 'Graphic JSON must be an object.')], warnings: warnings };
   if (String(payload.engine || '').toLowerCase() !== 'super') errors.push(issue('SUPER_ENGINE_CONFIG_INVALID', 'engine', 'Expected engine:"super".'));
@@ -20,17 +51,29 @@ export function validateSuperGraphic(payload) {
   if (!payload.data || typeof payload.data !== 'object' || Array.isArray(payload.data)) errors.push(issue('SUPER_JSON_FIELD_REQUIRED', 'data', 'data must be an object.'));
   if (errors.length) return { valid: false, errors: errors, warnings: warnings };
 
-  const known = new Set(['scene', 'calculus.functionGraph', 'calculus.regionBetweenCurves', 'calculus.tangent', 'calculus.secant', 'calculus.piecewise']);
+  const known = new Set(['scene', 'multiPanel', 'calculus.functionGraph', 'calculus.regionBetweenCurves', 'calculus.tangent', 'calculus.secant', 'calculus.piecewise']);
   if (!known.has(payload.type)) errors.push(issue('SUPER_PRIMITIVE_UNSUPPORTED', 'type', 'Unsupported Super graphic type: ' + payload.type));
-  if (payload.type === 'scene' && !Array.isArray(payload.data.items)) errors.push(issue('SUPER_SCENE_ITEMS_REQUIRED', 'data.items', 'Scene data.items must be an array.'));
+  if (payload.type === 'scene' && (!Array.isArray(payload.data.items) || !payload.data.items.length)) errors.push(issue('SUPER_SCENE_ITEMS_REQUIRED', 'data.items', 'Scene data.items must contain at least one drawable item.'));
   if (payload.type === 'scene' && Array.isArray(payload.data.items)) validateScene(payload.data.items, errors, 'data.items');
+  if (payload.type === 'multiPanel') validateMultiPanel(payload.data, errors);
   if (payload.type.indexOf('calculus.') === 0) validateCalculus(payload, errors);
   return { valid: errors.length === 0, errors: errors, warnings: warnings };
 }
 
 function validPoint(value) { return Array.isArray(value) && value.length === 2 && Number.isFinite(Number(value[0])) && Number.isFinite(Number(value[1])); }
+function validateMultiPanel(data, errors) {
+  const panels = Array.isArray(data && data.panels) ? data.panels : [];
+  if (!panels.length) { errors.push(issue('SUPER_MULTIPANEL_PANELS_REQUIRED', 'data.panels', 'Multi-panel data requires at least one panel.')); return; }
+  if (panels.length > 6) errors.push(issue('SUPER_MULTIPANEL_LIMIT_EXCEEDED', 'data.panels', 'A maximum of 6 panels is supported.'));
+  panels.forEach(function(panel, index) {
+    if (!panel || typeof panel !== 'object') { errors.push(issue('SUPER_JSON_FIELD_TYPE_INVALID', 'data.panels[' + index + ']', 'Each panel must be an object.')); return; }
+    const scene = panel.scene || panel.data;
+    if (!scene || !Array.isArray(scene.items)) errors.push(issue('SUPER_SCENE_ITEMS_REQUIRED', 'data.panels[' + index + '].scene.items', 'Each panel scene requires an items array.'));
+    else validateScene(scene.items, errors, 'data.panels[' + index + '].scene.items');
+  });
+}
 function validateScene(items, errors, path) {
-  const supported = new Set(['group','point','line','segment','ray','curve','region','circle','ellipse','rectangle','polygon','arc','vector','connector','text','mathLabel','symbol']);
+  const supported = new Set(['group','point','line','segment','ray','curve','polyline','region','circle','ellipse','rectangle','polygon','arc','vector','connector','text','mathLabel','symbol']);
   const ids = new Set();
   items.forEach(function(item, index) {
     const itemPath = path + '[' + index + ']';
@@ -40,6 +83,7 @@ function validateScene(items, errors, path) {
     if (item.type === 'group') { if (!Array.isArray(item.items)) errors.push(issue('SUPER_SCENE_ITEMS_REQUIRED', itemPath + '.items', 'A group requires an items array.')); else validateScene(item.items, errors, itemPath + '.items'); }
     if (item.type === 'point' && !validPoint(item.position)) errors.push(issue('SUPER_JSON_FIELD_TYPE_INVALID', itemPath + '.position', 'Point position must be [x, y].'));
     if (item.type === 'curve' && !item.pieces && (!item.expression || !safeExpression(item.expression))) errors.push(issue('SUPER_CURVE_EXPRESSION_INVALID', itemPath + '.expression', 'Curve expression is missing or invalid.'));
+    if (item.type === 'polyline' && (!Array.isArray(item.points) || item.points.length < 2 || item.points.some(function(point) { return !validPoint(point); }))) errors.push(issue('SUPER_JSON_FIELD_TYPE_INVALID', itemPath + '.points', 'Polyline points must contain at least two [x, y] coordinates.'));
     if (item.type === 'curve' && Array.isArray(item.pieces)) item.pieces.forEach(function(piece, pieceIndex) { if (!piece.expression || !safeExpression(piece.expression)) errors.push(issue('SUPER_CURVE_EXPRESSION_INVALID', itemPath + '.pieces[' + pieceIndex + '].expression', 'Piece expression is missing or invalid.')); });
     if (item.type === 'region' && !item.boundary) errors.push(issue('SUPER_REGION_BOUNDARY_INVALID', itemPath + '.boundary', 'A region requires a boundary.'));
     if (item.type === 'mathLabel' && !item.latex) errors.push(issue('SUPER_JSON_FIELD_REQUIRED', itemPath + '.latex', 'MathLabel requires latex.'));
@@ -82,6 +126,10 @@ function toScene(payload) {
   if (payload.type === 'calculus.regionBetweenCurves') scene.items.push({ type: 'region', boundary: { betweenCurves: data.region }, style: (data.region && data.region.style) || {} });
   if (payload.type === 'calculus.tangent') scene.items.push({ type: 'tangent', curve: scene.items[0].id, atX: Number(data.atX), options: data.tangent || {} });
   if (payload.type === 'calculus.secant') scene.items.push({ type: 'secant', curve: scene.items[0].id, xValues: data.xValues.map(Number), options: data.secant || {} });
+  (Array.isArray(data.points) ? data.points : []).forEach(function(point, index) {
+    const position = Array.isArray(point.position) ? point.position : point.coords;
+    if (Array.isArray(position)) scene.items.push({ id: point.id || ('point' + index), type: 'point', position: position, label: point.label || point.name || '', style: point.style || {}, marker: point.marker });
+  });
   return scene;
 }
 
@@ -89,6 +137,7 @@ function styles() {
   if (document.getElementById('super-graphic-engine-style')) return;
   const tag = document.createElement('style'); tag.id = 'super-graphic-engine-style';
   tag.textContent = '.super-graphic-host{margin:15px 0}.super-graphic-canvas-wrap{position:relative;width:100%;min-height:300px;border:1px solid #dbe3ee;border-radius:10px;background:#fff;overflow:hidden}.super-graphic-canvas{display:block;width:100%;min-height:300px}.super-graphic-label-layer{position:absolute;inset:0;pointer-events:none}.super-graphic-label{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;color:#111827}.super-graphic-error{margin:12px 0;padding:12px 14px;border:1px solid #f1a5a5;border-radius:8px;background:#fff1f1;color:#8a1c1c;font:14px/1.45 system-ui,sans-serif}.super-graphic-error ul{margin:8px 0 0 18px;padding:0}.super-graphic-loading{padding:14px;border-radius:8px;background:#f8fafc;color:#475569;font:14px system-ui,sans-serif}';
+  tag.textContent += '.super-graphic-panels{display:grid;gap:12px}.super-graphic-panel{min-width:0}.super-graphic-panel-title{font:700 13px system-ui;color:#334155;margin:0 0 5px 3px}';
   document.head.appendChild(tag);
 }
 
@@ -121,8 +170,8 @@ function drawCurve(ctx, t, item, curves) {
 }
 function curveValue(parts, x) { for (let i = 0; i < parts.length; i++) if (x >= parts[i].domain[0] - 1e-9 && x <= parts[i].domain[1] + 1e-9) return parts[i].fn(x); return NaN; }
 function drawRegion(ctx, t, item, curves) {
-  const data = item.boundary && item.boundary.betweenCurves; if (!data) return; const upper = curves[data.upper], lower = curves[data.lower]; if (!upper || !lower) throw new Error('Region references an unknown curve.'); const xRange = range(data.xRange, t.xRange), top = [], bottom = [];
-  for (let i = 0; i <= 360; i++) { const x = xRange[0] + (xRange[1] - xRange[0]) * i / 360, a = curveValue(upper, x), b = curveValue(lower, x); if (Number.isFinite(a) && Number.isFinite(b)) { top.push(t.toPx([x, a])); bottom.push(t.toPx([x, b])); } }
+  const boundary = item.boundary || {}, data = boundary.betweenCurves || (boundary.underCurve ? { upper: boundary.underCurve, lower: null, xRange: boundary.xRange, baseline: boundary.baseline } : null); if (!data) return; const upper = curves[data.upper], lower = data.lower ? curves[data.lower] : null; if (!upper || (data.lower && !lower)) throw new Error('Region references an unknown curve.'); const xRange = range(data.xRange, t.xRange), top = [], bottom = [], baseline = Number.isFinite(Number(data.baseline)) ? Number(data.baseline) : 0;
+  for (let i = 0; i <= 360; i++) { const x = xRange[0] + (xRange[1] - xRange[0]) * i / 360, a = curveValue(upper, x), b = lower ? curveValue(lower, x) : baseline; if (Number.isFinite(a) && Number.isFinite(b)) { top.push(t.toPx([x, a])); bottom.push(t.toPx([x, b])); } }
   if (top.length < 2) throw new Error('Region could not be closed.'); const style = item.style || {}; ctx.save(); ctx.globalAlpha = Number.isFinite(Number(style.opacity)) ? Number(style.opacity) : 1; ctx.fillStyle = style.fill || 'rgba(37,99,235,0.18)'; ctx.beginPath(); ctx.moveTo(top[0][0], top[0][1]); top.slice(1).forEach(function(p) { ctx.lineTo(p[0], p[1]); }); bottom.reverse().forEach(function(p) { ctx.lineTo(p[0], p[1]); }); ctx.closePath(); ctx.fill(); ctx.restore();
 }
 function drawPoint(ctx, t, point, style) { const p = t.toPx(point), s = style || {}; ctx.save(); ctx.fillStyle = s.fill || '#111827'; ctx.strokeStyle = s.stroke || '#111827'; ctx.lineWidth = Number(s.strokeWidth) || 1.5; ctx.beginPath(); ctx.arc(p[0], p[1], Number(s.radius) || 4, 0, Math.PI * 2); if (s.marker === 'open') { ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke(); } else ctx.fill(); ctx.restore(); }
@@ -225,6 +274,8 @@ function drawPrimitive(ctx, t, item, points) {
     const from = resolvePoint(item.from, points), through = resolvePoint(item.through, points); if (!from || !through) return; const dx = through[0] - from[0], dy = through[1] - from[1], scale = Math.max(t.xRange[1] - t.xRange[0], t.yRange[1] - t.yRange[0]) * 2; drawSegment(ctx, t, from, [from[0] + dx * scale, from[1] + dy * scale], item.style, 'end');
   } else if (item.type === 'vector') {
     const from = resolvePoint(item.from || [0, 0], points), to = item.to ? resolvePoint(item.to, points) : (from && Array.isArray(item.delta) ? [from[0] + Number(item.delta[0]), from[1] + Number(item.delta[1])] : null); if (from && to) drawSegment(ctx, t, from, to, item.style, 'end');
+  } else if (item.type === 'polyline') {
+    const vertices = Array.isArray(item.points) ? item.points.map(function(point) { return resolvePoint(point, points); }).filter(Boolean) : []; if (vertices.length < 2) return; lineStyle(ctx, item.style, DEFAULTS.curveColor); const first = t.toPx(vertices[0]); ctx.beginPath(); ctx.moveTo(first[0], first[1]); vertices.slice(1).forEach(function(point) { const p = t.toPx(point); ctx.lineTo(p[0], p[1]); }); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
   } else if (['circle', 'ellipse', 'rectangle', 'polygon', 'arc'].indexOf(item.type) >= 0) drawShape(ctx, t, item, points);
   else if (item.type === 'symbol') drawSymbol(ctx, t, item, points);
 }
@@ -238,7 +289,7 @@ function drawSceneV1(canvas, labels, scene) {
   drawCoordinates(ctx, t, coord);
   const curves = {}; items.filter(function(item) { return item.type === 'curve'; }).forEach(function(item) { drawCurve(ctx, t, item, curves); });
   items.filter(function(item) { return item.type === 'region'; }).forEach(function(item) { if (item.boundary && item.boundary.polygon) drawPolygonRegion(ctx, t, item, points); else drawRegion(ctx, t, item, curves); });
-  items.filter(function(item) { return ['line','segment','ray','vector','connector','circle','ellipse','rectangle','polygon','arc','symbol'].indexOf(item.type) >= 0; }).forEach(function(item) { drawPrimitive(ctx, t, item, points); });
+  items.filter(function(item) { return ['line','segment','ray','vector','connector','polyline','circle','ellipse','rectangle','polygon','arc','symbol'].indexOf(item.type) >= 0; }).forEach(function(item) { drawPrimitive(ctx, t, item, points); });
   items.filter(function(item) { return item.type === 'curve'; }).forEach(function(item) { drawCurve(ctx, t, item, curves); });
   items.filter(function(item) { return item.type === 'tangent' || item.type === 'secant'; }).forEach(function(item) { drawCalculatedLine(ctx, t, item, curves); });
   items.filter(function(item) { return item.type === 'point' && Array.isArray(item.position); }).forEach(function(item) { drawPoint(ctx, t, item.position, Object.assign({}, item.style || {}, { marker: item.marker })); });
@@ -248,8 +299,21 @@ function drawSceneV1(canvas, labels, scene) {
 function errorHtml(host, errors) { host.innerHTML = '<div class="super-graphic-error"><strong>Graphic validation failed.</strong><ul>' + errors.map(function(e) { return '<li><strong>' + e.code + '</strong>' + (e.path ? ' <code>' + e.path + '</code>' : '') + '<br>' + e.message + '</li>'; }).join('') + '</ul></div>'; }
 
 export function mountSuperGraphic(host, payload) {
-  styles(); const validation = validateSuperGraphic(payload); if (!validation.valid) { errorHtml(host, validation.errors); return validation; }
+  styles(); payload = normalizeSuperGraphicPayload(payload); const validation = validateSuperGraphic(payload); if (!validation.valid) { errorHtml(host, validation.errors); return validation; }
   try {
+    if (payload.type === 'multiPanel') {
+      const panels = payload.data.panels, requestedColumns = Number(payload.data.layout && payload.data.layout.columns);
+      const columns = requestedColumns >= 1 && requestedColumns <= 3 ? requestedColumns : (panels.length <= 2 ? panels.length : (panels.length <= 4 ? 2 : 3));
+      host.innerHTML = '<div class="super-graphic-panels" style="grid-template-columns:repeat(' + columns + ',minmax(0,1fr))"></div>';
+      const grid = host.firstElementChild;
+      panels.forEach(function(panel, index) {
+        const card = document.createElement('section'); card.className = 'super-graphic-panel';
+        if (panel.title || panel.id) { const title = document.createElement('div'); title.className = 'super-graphic-panel-title'; title.textContent = panel.title || '(' + panel.id + ')'; card.appendChild(title); }
+        const panelHost = document.createElement('div'); card.appendChild(panelHost); grid.appendChild(card);
+        mountSuperGraphic(panelHost, { engine: 'super', schemaVersion: payload.schemaVersion, type: 'scene', data: panel.scene || panel.data });
+      });
+      return validation;
+    }
     const scene = toScene(payload);
     if (host.__superGraphicResizeObserver) host.__superGraphicResizeObserver.disconnect();
     host.innerHTML = '<div class="super-graphic-canvas-wrap"><canvas class="super-graphic-canvas"></canvas><div class="super-graphic-label-layer"></div></div>';
