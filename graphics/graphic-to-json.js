@@ -123,7 +123,7 @@ Return NEEDS_REVIEW when it can render but visual placement needs human adjustme
 Return NEEDS_CONFIRMATION when any mathematical value, label, solid-versus-dashed distinction, endpoint type, equation, domain, boundary, tangent/intersection, or answer-relevant detail is uncertain.
 Return UNSUPPORTED when a structured recreation would be unreliable or has no practical benefit. Do not invent information.
 
-For READY, NEEDS_REVIEW, or NEEDS_CONFIRMATION, graphicJson must be one valid JSON object encoded as a string.
+For READY, NEEDS_REVIEW, or NEEDS_CONFIRMATION, graphicJson must be one valid JSON object encoded as a string. The wrapper verification array is required: for every curve with an expression, include its curveId and at least three exact keyPoints [x,y] from that curve, including the vertex when it is a quadratic. A curve can be READY only if evaluating its expression at every listed key point gives that y value. Use an empty verification array only when there are no expression curves.
 Use schemaVersion "1.1" and prefer this one universal contract:
 {"engine":"super","schemaVersion":"1.1","type":"scene","data":{"coordinateSystem":{},"items":[...]}}
 
@@ -167,9 +167,15 @@ function normalizeConversionOptions(raw) {
   const modes = new Set(['auto', 'calculus2d', 'multipanel', 'geometry', 'spatial']);
   const preserveAllowed = new Set(['labels', 'dashed-lines', 'shading', 'coordinates']);
   const panelValue = String(input.panelCount || 'auto');
-  const quality = input.quality === 'precision' ? 'precision' : 'standard';
+  const hasQualityChoice = input.quality === 'standard' || input.quality === 'precision';
+  const quality = hasQualityChoice ? input.quality : 'precision';
+  const requestedMode = modes.has(input.mode) ? input.mode : 'auto';
+  // Older viewers could send "multi-panel" with one panel for a graph that
+  // merely contains several curves. One panel is never a useful multi-panel
+  // layout, so safely treat it as automatic single-scene detection.
+  const mode = requestedMode === 'multipanel' && panelValue === '1' ? 'auto' : requestedMode;
   return {
-    mode: modes.has(input.mode) ? input.mode : 'auto',
+    mode,
     panelCount: panelValue === 'auto' || /^[1-6]$/.test(panelValue) ? panelValue : 'auto',
     quality,
     strict: input.strict !== false,
@@ -258,19 +264,30 @@ Audit before returning: (1) Is this one graph or separate panels? (2) Did every 
 function conversionSchema() {
   return {
     type: 'object', additionalProperties: false,
-    required: ['status', 'graphicJson', 'warnings', 'requiresReview'],
+    required: ['status', 'graphicJson', 'warnings', 'requiresReview', 'verification'],
     properties: {
       status: { type: 'string', enum: ['READY', 'NEEDS_REVIEW', 'NEEDS_CONFIRMATION', 'UNSUPPORTED'] },
       graphicJson: { type: 'string' },
       warnings: { type: 'array', items: { type: 'string' } },
-      requiresReview: { type: 'boolean' }
+      requiresReview: { type: 'boolean' },
+      verification: {
+        type: 'array',
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['curveId', 'keyPoints'],
+          properties: {
+            curveId: { type: 'string' },
+            keyPoints: { type: 'array', items: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 } }
+          }
+        }
+      }
     }
   };
 }
 
 function normalizeConversion(value) {
   const allowed = new Set(['READY', 'NEEDS_REVIEW', 'NEEDS_CONFIRMATION', 'UNSUPPORTED']);
-  const status = allowed.has(value?.status) ? value.status : 'NEEDS_CONFIRMATION';
+  let status = allowed.has(value?.status) ? value.status : 'NEEDS_CONFIRMATION';
   const warnings = Array.isArray(value?.warnings)
     ? value.warnings.map(item => String(item).trim()).filter(Boolean).slice(0, 12) : [];
   if (status === 'UNSUPPORTED') return { status, json: null, warnings, requiresReview: true };
@@ -289,7 +306,45 @@ function normalizeConversion(value) {
   if (!isBasicSuperGraphic(json)) {
     return { status: 'NEEDS_CONFIRMATION', json: null, warnings: [...warnings, 'Super Graphic 기본 형식 검증에 실패했습니다.'], requiresReview: true };
   }
+  const verification = verifyCurveAnchors(json, value?.verification);
+  if (!verification.valid) {
+    status = 'NEEDS_CONFIRMATION';
+    warnings.push(...verification.warnings);
+  }
   return { status, json, warnings, requiresReview: Boolean(value?.requiresReview) || status !== 'READY' };
+}
+
+function verifyCurveAnchors(json, rawChecks) {
+  const curves = json?.type === 'scene' && Array.isArray(json?.data?.items)
+    ? json.data.items.filter(item => item?.type === 'curve' && item.expression)
+    : [];
+  if (!curves.length) return { valid: true, warnings: [] };
+  const checks = Array.isArray(rawChecks) ? rawChecks : [];
+  const warnings = [];
+  for (const curve of curves) {
+    const check = checks.find(item => item?.curveId === curve.id);
+    if (!check || !Array.isArray(check.keyPoints) || check.keyPoints.length < 3) {
+      warnings.push(`Curve ${curve.id} has no verified vertex/endpoints.`);
+      continue;
+    }
+    const evaluator = safeExpressionEvaluator(curve.expression);
+    if (!evaluator || check.keyPoints.some(point => !Array.isArray(point) || point.length < 2 || Math.abs(evaluator(Number(point[0])) - Number(point[1])) > 0.12)) {
+      warnings.push(`Curve ${curve.id} does not match its verified key points.`);
+    }
+  }
+  return { valid: warnings.length === 0, warnings };
+}
+
+function safeExpressionEvaluator(expression) {
+  const source = String(expression || '').replace(/\^/g, '**').trim();
+  if (!/^[0-9x+\-*/().\s]+$/.test(source)) return null;
+  try {
+    const fn = Function('x', `"use strict"; return (${source});`);
+    return x => {
+      const value = fn(x);
+      return Number.isFinite(value) ? value : NaN;
+    };
+  } catch { return null; }
 }
 
 // Vision models sometimes describe a hand-drawn curve as points, or repeat the
