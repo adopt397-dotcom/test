@@ -69,6 +69,58 @@ const TEMPLATES = {
       { type: 'segment', from: [0, 6], to: [6, 0], attributes: { strokeColor: '#2563eb' } },
       { type: 'text', position: [3.2, 3.4], text: 'x + y ≤ 6' }
     ] })
+  },
+  calculus_integral_area: {
+    label: 'Calculus: definite integral area',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-1, 5, 4, -1], grid: true }, objects: [
+      { id: 'f', type: 'functiongraph', expression: '4 - x^2', range: [-1, 2], attributes: { strokeColor: '#2563eb' } },
+      { id: 'axis', type: 'functiongraph', expression: '0', range: [0, 2], attributes: { strokeColor: '#111827' } },
+      { type: 'regionBetweenCurves', upper: 'f', lower: 'axis', range: [0, 2], attributes: { fillColor: '#60a5fa', fillOpacity: 0.25 } },
+      { type: 'text', position: [0.7, 3.5], text: '∫₀² (4 − x²) dx' }
+    ] })
+  },
+  calculus_riemann_sum: {
+    label: 'Calculus: Riemann sum',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-0.5, 5, 4.5, -0.5], grid: true }, objects: [
+      { id: 'f', type: 'functiongraph', expression: 'x^2/4 + 1', range: [0, 4], attributes: { strokeColor: '#2563eb' } },
+      { type: 'polygon', points: [[0, 0], [1, 0], [1, 1.25], [0, 1.25]], attributes: { strokeColor: '#64748b', fillColor: '#cbd5e1', fillOpacity: 0.32 } },
+      { type: 'polygon', points: [[1, 0], [2, 0], [2, 2], [1, 2]], attributes: { strokeColor: '#64748b', fillColor: '#cbd5e1', fillOpacity: 0.32 } },
+      { type: 'polygon', points: [[2, 0], [3, 0], [3, 3.25], [2, 3.25]], attributes: { strokeColor: '#64748b', fillColor: '#cbd5e1', fillOpacity: 0.32 } },
+      { type: 'polygon', points: [[3, 0], [4, 0], [4, 5], [3, 5]], attributes: { strokeColor: '#64748b', fillColor: '#cbd5e1', fillOpacity: 0.32 } }
+    ] })
+  },
+  calculus_tangent_secant: {
+    label: 'Calculus: tangent and secant',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-2, 7, 5, -3], grid: true }, objects: [
+      { id: 'f', type: 'functiongraph', expression: 'x^2', range: [-1.5, 3], attributes: { strokeColor: '#2563eb' } },
+      { type: 'line', through: [[-2, -4], [3, 6]], attributes: { strokeColor: '#dc2626', dash: 2 } },
+      { type: 'segment', from: [1, 1], to: [2, 4], attributes: { strokeColor: '#059669' } },
+      { type: 'point', coords: [1, 1], name: 'P', attributes: { fillColor: '#111827' } },
+      { type: 'point', coords: [2, 4], name: 'Q', attributes: { fillColor: '#111827' } }
+    ] })
+  },
+  calculus_parametric: {
+    label: 'Calculus: parametric curve',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-4, 4, 4, -4], grid: true }, objects: [
+      { type: 'parametric', xExpression: '3*cos(t)', yExpression: '2*sin(t)', range: [0, 6.283185307179586], attributes: { strokeColor: '#2563eb' } },
+      { type: 'text', position: [-3.5, 3.2], text: 'x = 3 cos t,  y = 2 sin t' }
+    ] })
+  },
+  calculus_polar: {
+    label: 'Calculus: polar curve',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-3, 3, 3, -3], grid: true }, objects: [
+      { type: 'polar', rExpression: '2*sin(2*t)', range: [0, 6.283185307179586], attributes: { strokeColor: '#2563eb' } },
+      { type: 'text', position: [-2.8, 2.5], text: 'r = 2 sin(2θ)' }
+    ] })
+  },
+  calculus_accumulation: {
+    label: 'Calculus: accumulation / FTC',
+    build: () => ({ engine: 'jsxgraph', board: { boundingbox: [-1, 6, 5, -2], grid: true }, objects: [
+      { id: 'rate', type: 'functiongraph', expression: 'sin(x) + 1', range: [0, 4], attributes: { strokeColor: '#2563eb' } },
+      { id: 'axis', type: 'functiongraph', expression: '0', range: [0, 4], attributes: { strokeColor: '#111827' } },
+      { type: 'regionBetweenCurves', upper: 'rate', lower: 'axis', range: [0, 3], attributes: { fillColor: '#60a5fa', fillOpacity: 0.22 } },
+      { type: 'text', position: [1.2, 4.8], text: 'A(x) = ∫₀ˣ f(t) dt' }
+    ] })
   }
 };
 

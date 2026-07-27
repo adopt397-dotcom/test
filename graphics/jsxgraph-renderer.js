@@ -20,9 +20,9 @@ function evaluate(expression) {
   if (!window.math || !expression) return null;
   try {
     const compiled = window.math.compile(String(expression));
-    return x => {
-      const y = Number(compiled.evaluate({ x, pi: Math.PI, e: Math.E }));
-      return Number.isFinite(y) ? y : NaN;
+    return (x, y, t) => {
+      const value = Number(compiled.evaluate({ x, y, t, pi: Math.PI, e: Math.E }));
+      return Number.isFinite(value) ? value : NaN;
     };
   } catch (_) { return null; }
 }
@@ -137,6 +137,18 @@ function jsxGraphScene(payload) {
     const style = object.attributes || object.style || {};
     if (type === 'point') return { type: 'point', id, position: object.coords || object.position, label: object.name || object.label || '', style };
     if (type === 'functiongraph') return { type: 'curve', id, expression: object.expression, domain: object.range || object.domain, style };
+    if (type === 'parametric') {
+      const xFn = evaluate(object.xExpression), yFn = evaluate(object.yExpression), range = numberRange(object.range, [0, 1]);
+      const points = [];
+      if (xFn && yFn && range) for (let step = 0; step <= 180; step++) { const t = range[0] + (range[1] - range[0]) * step / 180, x = xFn(0, 0, t), y = yFn(0, 0, t); if (Number.isFinite(x) && Number.isFinite(y)) points.push([x, y]); }
+      return { type: 'polyline', id, points, style };
+    }
+    if (type === 'polar') {
+      const rFn = evaluate(object.rExpression), range = numberRange(object.range, [0, 2 * Math.PI]);
+      const points = [];
+      if (rFn && range) for (let step = 0; step <= 240; step++) { const t = range[0] + (range[1] - range[0]) * step / 240, r = rFn(0, 0, t); if (Number.isFinite(r)) points.push([r * Math.cos(t), r * Math.sin(t)]); }
+      return { type: 'polyline', id, points, style };
+    }
     if (type === 'segment' || type === 'arrow') return { type: type === 'arrow' ? 'vector' : 'segment', id, from: object.from, to: object.to, style };
     if (type === 'line') return { type: 'line', id, through: object.through, x: object.x, y: object.y, style };
     if (type === 'circle') return { type: 'circle', id, center: object.center, radius: object.radius, style };
