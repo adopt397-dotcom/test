@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GongBoo JSXGraph Reference Catalog</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#14213d;background:#f1f5f9}*{box-sizing:border-box}body{margin:0}.head{padding:20px;background:#0a1628;color:#fff;border-bottom:3px solid #f5a623}.head h1{margin:0;font-size:21px}.head p{margin:6px 0 0;color:#cbd5e1}.main{max-width:1180px;margin:auto;padding:18px}.filters{display:flex;flex-wrap:wrap;gap:9px;padding:12px;background:#fff;border:1px solid #dbe3ee;border-radius:10px}.filters input,.filters select{padding:8px;border:1px solid #94a3b8;border-radius:6px;font:14px system-ui}.filters input{min-width:260px;flex:1}.summary{margin:14px 0;color:#475569}.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:10px}.card{padding:12px;background:#fff;border:1px solid #dbe3ee;border-radius:9px}.card h2{margin:0 0 7px;font-size:15px}.card p{margin:4px 0;color:#64748b;font-size:12px;overflow-wrap:anywhere}.tag{display:inline-block;margin:0 4px 5px 0;padding:2px 7px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:11px}.tag.raw{background:#fef3c7;color:#92400e}.card a{color:#1d4ed8;font-size:13px}.empty{padding:28px;background:#fff;border-radius:9px;color:#64748b}
+  </style>
+</head>
+<body>
+  <header class="head"><h1>GongBoo official JSXGraph reference catalog</h1><p>Complete upstream reference — raw examples are kept separately from tested GongBoo templates.</p></header>
+  <main class="main">
+    <div class="filters"><input id="search" placeholder="Search filename or source path"><select id="dimension"><option value="">All dimensions</option><option value="2d">2D</option><option value="3d">3D</option></select><select id="category"><option value="">All categories</option><option value="calculus">Calculus</option><option value="geometry">Geometry</option><option value="spatial">Spatial</option><option value="other">Other</option></select><select id="format"><option value="">All formats</option><option value="html">HTML</option><option value="xml">XML</option><option value="i2g">I2G</option><option value="txt">TXT</option></select></div>
+    <p id="summary" class="summary">Loading catalog…</p><section id="list" class="list"></section>
+  </main>
+  <script>
+    const search=document.querySelector('#search'),dimension=document.querySelector('#dimension'),category=document.querySelector('#category'),format=document.querySelector('#format'),list=document.querySelector('#list'),summary=document.querySelector('#summary');
+    let entries=[];
+    function esc(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    function render(){const term=search.value.trim().toLowerCase();const filtered=entries.filter(e=>(!term||(e.title+' '+e.sourcePath).toLowerCase().includes(term))&&(!dimension.value||e.dimension===dimension.value)&&(!category.value||e.category===category.value)&&(!format.value||e.format===format.value));summary.textContent=`Showing ${filtered.length} of ${entries.length} upstream files. raw-only means not yet converted to GongBoo JSON.`;list.innerHTML=filtered.length?filtered.map(e=>`<article class="card"><h2>${esc(e.title)}</h2><span class="tag">${esc(e.dimension)}</span><span class="tag">${esc(e.category)}</span><span class="tag">${esc(e.format)}</span><span class="tag raw">raw-only</span><p>${esc(e.sourcePath)}</p><a href="${esc(e.sourceUrl)}" target="_blank" rel="noopener">Open official source ↗</a></article>`).join(''):'<p class="empty">No matching upstream examples.</p>';}
+    [search,dimension,category,format].forEach(input=>input.addEventListener('input',render));
+    fetch('./jsxgraph-catalog.json').then(r=>r.json()).then(data=>{entries=data.entries||[];render();}).catch(()=>{summary.textContent='Catalog could not be loaded.';});
+  </script>
+</body>
+</html>

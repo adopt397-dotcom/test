@@ -11,6 +11,18 @@ It includes the complete upstream `examples/` collection and documentation witho
 - License: JSXGraph is dual licensed under MIT and LGPL-3.0-or-later.
 - Purpose: source reference, not a runtime dependency of the GongBoo viewer.
 
+`reference/threejs-official/` is the official Three.js repository, also tracked as a Git submodule.
+Its complete `examples/` collection is kept separately for 3D reference.
+
+- Upstream: https://github.com/mrdoob/three.js
+- License: MIT
+- Purpose: source reference, not a runtime dependency of the GongBoo viewer.
+
+Browsable catalogs:
+
+- `reference/catalog.html` — complete JSXGraph / 2D source catalog
+- `reference/threejs-catalog.html` — complete Three.js / 3D source catalog
+
 ## 2. GongBoo reusable templates
 
 `jsxgraph-templates.js` contains the small, tested template set that appears in the Viewer menu.
