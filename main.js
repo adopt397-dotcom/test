@@ -4520,7 +4520,7 @@ function parseGraphicPayload(jsonData) {
 // Super graphic Router: Legacy SAT graphics stay on the existing renderer.
 // New engines are loaded only for an explicit engine field in G-cell JSON.
 // ------------------------------------------------------------------------
-var gongbooGraphicAssets = { jsxScript: null, jsxStyle: null, jsxModule: null, threeModule: null, tableModule: null };
+var gongbooGraphicAssets = { jsxScript: null, jsxStyle: null, jsxModule: null, threeModule: null, tableModule: null, chartModule: null };
 
 function loadGongbooGraphicScript(src) {
     if (gongbooGraphicAssets.jsxScript) return gongbooGraphicAssets.jsxScript;
@@ -4550,7 +4550,7 @@ function loadGongbooGraphicStyle(href) {
 
 function renderNewGraphicEngine(parsedData) {
     var engine = String(parsedData && parsedData.engine || '').toLowerCase().trim();
-    if (engine !== 'jsxgraph' && engine !== 'three3d' && engine !== 'table') return null;
+    if (engine !== 'jsxgraph' && engine !== 'three3d' && engine !== 'table' && engine !== 'chart') return null;
 
     var hostId = 'gongboo_new_graphic_' + Math.random().toString(36).slice(2, 10);
     var html = '<div style="margin:15px 0;padding:12px;background:#fff;border:1px solid #dbe3ee;border-radius:10px;">' +
@@ -4581,6 +4581,13 @@ function renderNewGraphicEngine(parsedData) {
                     if (!validation.valid || !module.mountTable(host, parsedData)) throw new Error('Invalid table payload.');
                     if (typeof ensureMathJax === 'function') ensureMathJax().then(function() { return module.typesetTableMath(host); });
                 }).catch(function(error) { console.error('Table render failed:', error); fail(); });
+            } else if (engine === 'chart') {
+                if (!gongbooGraphicAssets.chartModule) gongbooGraphicAssets.chartModule = import('./graphics/chart-renderer.js?v=chart-20260727');
+                Promise.all([ensureChartJS(), gongbooGraphicAssets.chartModule]).then(function(results) {
+                    var module = results[1];
+                    var validation = module.validateChartPayload(parsedData);
+                    if (!validation.valid || !module.mountChart(host, parsedData)) throw new Error('Invalid chart payload.');
+                }).catch(function(error) { console.error('Chart render failed:', error); fail(); });
             } else {
                 if (!gongbooGraphicAssets.threeModule) gongbooGraphicAssets.threeModule = import('./graphics/g3scene.js?v=afe89c4');
                 gongbooGraphicAssets.threeModule.then(function(module) {
