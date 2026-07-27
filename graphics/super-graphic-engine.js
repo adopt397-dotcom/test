@@ -1,4 +1,4 @@
-/* GongBoo Super Graphic Engine v1: isolated renderer for engine:"super" JSON. */
+/* GongBoo Super Graphic Engine v1.1 — scene.items, multiPanel, polyline, general regions. */
 const DEFAULTS = { xRange: [-10, 10], yRange: [-10, 10], gridColor: '#d9d9d9', axisColor: '#111827', curveColor: '#2563eb', labelColor: '#111827' };
 const ALLOWED_IDENTIFIERS = new Set(['x', 'y', 'pi', 'e', 'sqrt', 'abs', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'exp', 'log', 'log10', 'floor', 'ceil', 'min', 'max']);
 
