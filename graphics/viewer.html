@@ -20,12 +20,13 @@
         <div class="endpoint"><input id="aiEndpoint" type="url" value="https://sat-bot-07020143.vercel.app/api/graphic-to-json" placeholder="Authorized image-to-JSON endpoint"><button id="generateJson" class="warn" type="button">Generate JSON</button></div>
         <div class="conversion-options">
           <div class="conversion-row">
-            <label>Conversion mode<select id="conversionMode"><option value="auto">Auto detect</option><option value="calculus2d">2D Calculus</option><option value="multipanel">Multi-panel (2–6)</option><option value="geometry">Geometry</option><option value="spatial">Spatial / 3D projection</option></select></label>
-            <label>Panels<select id="panelCount"><option value="auto">Auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select></label>
+            <label>Conversion mode<select id="conversionMode"><option value="auto">Auto detect</option><option value="calculus2d">One graph / 2D Calculus</option><option value="multipanel">Separate panels only (A/B/C)</option><option value="geometry">Geometry</option><option value="spatial">Spatial / 3D projection</option></select></label>
+            <label>Quality<select id="conversionQuality"><option value="standard">Standard</option><option value="precision">Precision (slower)</option></select></label>
           </div>
+          <label>Separate panels only<select id="panelCount"><option value="auto">Auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select><small>Panels means separate (A)/(B) diagrams — not the number of curves in one graph.</small></label>
           <label><input id="strictMode" type="checkbox" checked> Strict: do not guess answer-relevant facts</label>
           <div class="preserve-options"><label><input class="preserve-option" type="checkbox" value="labels" checked> Labels</label><label><input class="preserve-option" type="checkbox" value="dashed-lines" checked> Dashed lines</label><label><input class="preserve-option" type="checkbox" value="shading" checked> Shading</label><label><input class="preserve-option" type="checkbox" value="coordinates" checked> Coordinates</label></div>
-          <label>Known formula or instruction (optional)<textarea id="conversionNotes" placeholder="Example: y = 2 sin t; use 4 panels; shaded region is the answer-relevant part."></textarea></label>
+          <label>Known formula or instruction (optional)<textarea id="conversionNotes" placeholder="Example: four curves share one set of axes; three are dashed; vertices are vertically aligned; show y = 2."></textarea></label>
         </div>
         <p class="muted">Generate JSON is enabled only when an authorized analysis endpoint is configured. Manual JSON review works without one.</p>
       </div>

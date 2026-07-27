@@ -8,6 +8,7 @@ const status = document.getElementById('jsonStatus');
 const issues = document.getElementById('issues');
 const endpoint = document.getElementById('aiEndpoint');
 const conversionMode = document.getElementById('conversionMode');
+const conversionQuality = document.getElementById('conversionQuality');
 const panelCount = document.getElementById('panelCount');
 const strictMode = document.getElementById('strictMode');
 const conversionNotes = document.getElementById('conversionNotes');
@@ -134,6 +135,7 @@ document.getElementById('generateJson').addEventListener('click', async function
   try {
     const conversion = {
       mode: conversionMode.value,
+      quality: conversionQuality.value,
       panelCount: panelCount.value,
       strict: strictMode.checked,
       preserve: Array.from(document.querySelectorAll('.preserve-option:checked')).map(function(input) { return input.value; }),
