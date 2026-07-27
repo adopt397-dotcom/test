@@ -1,0 +1,3 @@
+[submodule "graphics/reference/jsxgraph-official"]
+	path = graphics/reference/jsxgraph-official
+	url = https://github.com/jsxgraph/jsxgraph.git
