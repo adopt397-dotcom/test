@@ -125,6 +125,43 @@ function legacyCalculusScene(payload) {
   return curveItems.length ? { coordinateSystem: data.coordinateSystem || {}, items: curveItems } : null;
 }
 
+function jsxGraphScene(payload) {
+  if (!payload || String(payload.engine || '').toLowerCase() !== 'jsxgraph') return null;
+  const board = payload.board || {};
+  const boundingbox = Array.isArray(board.boundingbox) && board.boundingbox.length === 4 ? board.boundingbox.map(Number) : [-10, 10, 10, -10];
+  if (!(boundingbox[0] < boundingbox[2] && boundingbox[3] < boundingbox[1])) return null;
+  const objects = Array.isArray(payload.objects) ? payload.objects : [];
+  const items = objects.map((object, index) => {
+    const type = String(object.type || '').toLowerCase();
+    const id = object.id || ('object' + index);
+    const style = object.attributes || object.style || {};
+    if (type === 'point') return { type: 'point', id, position: object.coords || object.position, label: object.name || object.label || '', style };
+    if (type === 'functiongraph') return { type: 'curve', id, expression: object.expression, domain: object.range || object.domain, style };
+    if (type === 'segment' || type === 'arrow') return { type: type === 'arrow' ? 'vector' : 'segment', id, from: object.from, to: object.to, style };
+    if (type === 'line') return { type: 'line', id, through: object.through, x: object.x, y: object.y, style };
+    if (type === 'circle') return { type: 'circle', id, center: object.center, radius: object.radius, style };
+    if (type === 'polygon') return { type: 'polygon', id, points: object.points, style };
+    if (type === 'text') return { type: 'text', id, position: object.position, value: object.value || object.text || '', style };
+    if (type === 'regionbetweencurves') return { type: 'region', id, boundary: { between: { upper: object.upper, lower: object.lower, xRange: object.range || object.xRange } }, style };
+    return { type: 'unsupported', id };
+  });
+  return {
+    coordinateSystem: { xRange: [boundingbox[0], boundingbox[2]], yRange: [boundingbox[3], boundingbox[1]], grid: !!board.grid },
+    items
+  };
+}
+
+export function validateJsxGraphPayload(payload) {
+  const errors = [];
+  if (!payload || String(payload.engine || '').toLowerCase() !== 'jsxgraph') errors.push({ code: 'JSXGRAPH_ENGINE_REQUIRED', path: 'engine', message: 'Expected engine: "jsxgraph".' });
+  if (!payload || !Array.isArray(payload.objects) || !payload.objects.length) errors.push({ code: 'JSXGRAPH_OBJECTS_REQUIRED', path: 'objects', message: 'objects must contain at least one JSXGraph object.' });
+  if (payload && Array.isArray(payload.objects)) payload.objects.forEach((object, index) => {
+    if (!object || !object.type) errors.push({ code: 'JSXGRAPH_OBJECT_TYPE_REQUIRED', path: 'objects[' + index + '].type', message: 'Each object needs a type.' });
+    if (object && String(object.type).toLowerCase() === 'functiongraph' && !object.expression) errors.push({ code: 'JSXGRAPH_EXPRESSION_REQUIRED', path: 'objects[' + index + '].expression', message: 'functiongraph requires an expression.' });
+  });
+  return { valid: errors.length === 0, errors, warnings: [] };
+}
+
 export function mountJsxGraph(host, payload) {
   if (!window.JXG || !window.JXG.JSXGraph) return null;
   if (payload.type === 'multiPanel') {
@@ -134,7 +171,7 @@ export function mountJsxGraph(host, payload) {
     panels.forEach(panel => { const card = document.createElement('section'); card.className = 'gongboo-jxg-panel'; if (panel.title || panel.id) card.innerHTML = '<div>' + (panel.title || panel.id) + '</div>'; const target = document.createElement('div'); card.appendChild(target); host.firstElementChild.appendChild(card); mountScene(target, panel.scene || panel.data); });
     return true;
   }
-  const scene = payload.type === 'scene' ? payload.data : legacyCalculusScene(payload);
+  const scene = jsxGraphScene(payload) || (payload.type === 'scene' ? payload.data : legacyCalculusScene(payload));
   if (!scene) return null;
   mountScene(host, scene);
   return true;

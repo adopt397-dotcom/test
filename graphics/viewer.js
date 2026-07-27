@@ -1,7 +1,8 @@
 import { mountSuperGraphic, validateSuperGraphic } from './super-graphic-engine.js';
 let mountJsxGraph = function() { return null; };
+let validateJsxGraphPayload = function() { return { valid: false, errors: [{ code: 'JSXGRAPH_ADAPTER_LOADING', message: 'JSXGraph adapter is still loading.' }], warnings: [] }; };
 import('./jsxgraph-renderer.js')
-  .then(function(module) { mountJsxGraph = module.mountJsxGraph; })
+  .then(function(module) { mountJsxGraph = module.mountJsxGraph; validateJsxGraphPayload = module.validateJsxGraphPayload; })
   .catch(function() { console.warn('JSXGraph adapter is unavailable; using the compatible renderer.'); });
 
 const imageInput = document.getElementById('imageInput');
@@ -51,7 +52,9 @@ function render() {
     setStatus('JSON syntax error.', 'error');
     return;
   }
-  const validation = validateSuperGraphic(parsed.value);
+  const validation = String(parsed.value.engine || '').toLowerCase() === 'jsxgraph'
+    ? validateJsxGraphPayload(parsed.value)
+    : validateSuperGraphic(parsed.value);
   showIssues(validation);
   if (!validation.valid) {
     viewerHost.innerHTML = '';
@@ -127,7 +130,9 @@ document.getElementById('formatJson').addEventListener('click', function() {
 document.getElementById('copyJson').addEventListener('click', async function() {
   const parsed = parseJson();
   if (parsed.error) { setStatus('Cannot copy invalid JSON.', 'error'); return; }
-  const validation = validateSuperGraphic(parsed.value);
+  const validation = String(parsed.value.engine || '').toLowerCase() === 'jsxgraph'
+    ? validateJsxGraphPayload(parsed.value)
+    : validateSuperGraphic(parsed.value);
   if (!validation.valid) { showIssues(validation); setStatus('Fix validation errors before copying G-cell JSON.', 'error'); return; }
   try { await navigator.clipboard.writeText(JSON.stringify(parsed.value)); setStatus('Compact Super JSON copied for the G cell.', 'success'); }
   catch (_) { setStatus('Clipboard access was unavailable. Copy the formatted JSON manually.', 'warning'); }
