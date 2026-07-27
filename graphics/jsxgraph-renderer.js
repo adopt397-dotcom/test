@@ -6,14 +6,14 @@ function numberRange(value, fallback) {
 }
 
 function attributes(style = {}) {
-  return {
-    strokeColor: style.stroke || style.color || '#2563eb',
-    fillColor: style.fill || 'none',
+  return Object.assign({}, style, {
+    strokeColor: style.strokeColor || style.stroke || style.color || '#2563eb',
+    fillColor: style.fillColor || style.fill || 'none',
     strokeWidth: Number(style.strokeWidth || 2),
-    dash: style.lineStyle === 'dashed' ? 2 : 0,
+    dash: Number.isFinite(Number(style.dash)) ? Number(style.dash) : (style.lineStyle === 'dashed' ? 2 : 0),
     fixed: true,
     highlight: false
-  };
+  });
 }
 
 function evaluate(expression) {

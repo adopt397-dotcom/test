@@ -1,4 +1,5 @@
 import { mountSuperGraphic, validateSuperGraphic } from './super-graphic-engine.js';
+import { listTemplates, createTemplate } from './jsxgraph-templates.js';
 let mountJsxGraph = function() { return null; };
 let validateJsxGraphPayload = function() { return { valid: false, errors: [{ code: 'JSXGRAPH_ADAPTER_LOADING', message: 'JSXGraph adapter is still loading.' }], warnings: [] }; };
 import('./jsxgraph-renderer.js')
@@ -17,6 +18,7 @@ const conversionQuality = document.getElementById('conversionQuality');
 const panelCount = document.getElementById('panelCount');
 const strictMode = document.getElementById('strictMode');
 const conversionNotes = document.getElementById('conversionNotes');
+const templateSelect = document.getElementById('templateSelect');
 let sourceImageDataUrl = '';
 
 function setStatus(message, kind) {
@@ -42,6 +44,12 @@ function escapeHtml(value) {
 function parseJson() {
   try { return { value: JSON.parse(jsonInput.value) }; }
   catch (error) { return { error: error }; }
+}
+
+function initializeTemplates() {
+  templateSelect.innerHTML = '<option value="">Choose a reusable template…</option>' + listTemplates().map(function(template) {
+    return '<option value="' + escapeHtml(template.id) + '">' + escapeHtml(template.label) + '</option>';
+  }).join('');
 }
 
 function render() {
@@ -121,6 +129,12 @@ document.getElementById('clearImage').addEventListener('click', function() {
   imageStage.innerHTML = '<span class="muted">Drop or choose a source image.<br>It is used for review only and is never embedded in JSON.</span>';
 });
 document.getElementById('renderJson').addEventListener('click', render);
+document.getElementById('loadTemplate').addEventListener('click', function() {
+  const template = createTemplate(templateSelect.value);
+  if (!template) { setStatus('Choose a template first.', 'warning'); return; }
+  jsonInput.value = JSON.stringify(template, null, 2);
+  render();
+});
 document.getElementById('formatJson').addEventListener('click', function() {
   const parsed = parseJson();
   if (parsed.error) { setStatus('Cannot format invalid JSON.', 'error'); return; }
@@ -170,4 +184,5 @@ document.getElementById('generateJson').addEventListener('click', async function
   }
 });
 
+initializeTemplates();
 render();
