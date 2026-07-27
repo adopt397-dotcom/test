@@ -39,6 +39,7 @@ function mountScene(host, scene) {
     keepaspectratio: false
   });
   const points = {};
+  const curves = {};
   const items = Array.isArray(scene.items) ? scene.items : [];
   items.forEach(item => {
     const style = attributes(item.style);
@@ -47,11 +48,38 @@ function mountScene(host, scene) {
       if (item.id) points[item.id] = p;
     }
   });
+  items.filter(item => item.type === 'curve' && item.expression).forEach(item => {
+    const fn = evaluate(item.expression), domain = numberRange(item.domain, xRange);
+    if (fn) curves[item.id || item.expression] = { fn, domain };
+  });
+  items.filter(item => item.type === 'region' && item.boundary && item.boundary.between).forEach(item => {
+    const between = item.boundary.between;
+    const upper = curves[between.upper], lower = curves[between.lower];
+    const domain = numberRange(between.xRange, upper && lower ? [Math.max(upper.domain[0], lower.domain[0]), Math.min(upper.domain[1], lower.domain[1])] : null);
+    if (!upper || !lower || !domain) return;
+    const count = 180, xs = [], ys = [];
+    for (let index = 0; index <= count; index++) {
+      const x = domain[0] + (domain[1] - domain[0]) * index / count, y = upper.fn(x);
+      if (Number.isFinite(y)) { xs.push(x); ys.push(y); }
+    }
+    for (let index = count; index >= 0; index--) {
+      const x = domain[0] + (domain[1] - domain[0]) * index / count, y = lower.fn(x);
+      if (Number.isFinite(y)) { xs.push(x); ys.push(y); }
+    }
+    if (xs.length >= 6) board.create('curve', [xs, ys], {
+      strokeOpacity: 0,
+      fillColor: item.style?.fill || '#2563eb',
+      fillOpacity: Number(item.style?.fillOpacity ?? 0.18),
+      fixed: true,
+      highlight: false,
+      curveType: 'plot'
+    });
+  });
   items.forEach(item => {
     const style = attributes(item.style);
     if (item.type === 'curve' && item.expression) {
-      const fn = evaluate(item.expression), domain = numberRange(item.domain, xRange);
-      if (fn) board.create('functiongraph', [fn, domain[0], domain[1]], style);
+      const curve = curves[item.id || item.expression];
+      if (curve) board.create('functiongraph', [curve.fn, curve.domain[0], curve.domain[1]], style);
     } else if (item.type === 'polyline' && Array.isArray(item.points) && item.points.length > 1) {
       board.create('curve', [item.points.map(p => p[0]), item.points.map(p => p[1])], Object.assign(style, { curveType: 'plot' }));
     } else if ((item.type === 'segment' || item.type === 'connector' || item.type === 'vector') && Array.isArray(item.from) && Array.isArray(item.to)) {
@@ -82,6 +110,17 @@ function legacyCalculusScene(payload) {
   })) : [];
   if (payload.type === 'calculus.piecewise' && Array.isArray(data.pieces)) {
     data.pieces.forEach((piece, index) => curveItems.push({ id: 'piece' + index, type: 'curve', expression: piece.expression, domain: piece.domain, style: piece.style || {} }));
+  }
+  if (payload.type === 'calculus.regionBetweenCurves' && data.region) {
+    curveItems.push({
+      type: 'region',
+      boundary: { between: {
+        upper: data.region.upper,
+        lower: data.region.lower,
+        xRange: data.region.xRange
+      } },
+      style: data.region.style || { fill: '#2563eb', fillOpacity: 0.18 }
+    });
   }
   return curveItems.length ? { coordinateSystem: data.coordinateSystem || {}, items: curveItems } : null;
 }
