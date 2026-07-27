@@ -1,4 +1,8 @@
 import { mountSuperGraphic, validateSuperGraphic } from './super-graphic-engine.js';
+let mountJsxGraph = function() { return null; };
+import('./jsxgraph-renderer.js')
+  .then(function(module) { mountJsxGraph = module.mountJsxGraph; })
+  .catch(function() { console.warn('JSXGraph adapter is unavailable; using the compatible renderer.'); });
 
 const imageInput = document.getElementById('imageInput');
 const imageStage = document.getElementById('imageStage');
@@ -54,9 +58,10 @@ function render() {
     setStatus('Validation failed. Fix the highlighted JSON fields.', 'error');
     return;
   }
-  const result = mountSuperGraphic(viewerHost, parsed.value);
+  const usedJsxGraph = mountJsxGraph(viewerHost, parsed.value);
+  const result = usedJsxGraph ? validation : mountSuperGraphic(viewerHost, parsed.value);
   showIssues(result);
-  setStatus(result.valid ? 'READY — validated and rendered.' : 'Renderer reported an error.', result.valid ? 'success' : 'error');
+  setStatus(result.valid ? (usedJsxGraph ? 'READY — JSXGraph rendered.' : 'READY — validated and rendered.') : 'Renderer reported an error.', result.valid ? 'success' : 'error');
 }
 
 function loadSourceImageFile(file) {
