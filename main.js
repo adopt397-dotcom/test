@@ -4516,9 +4516,85 @@ function parseGraphicPayload(jsonData) {
     return null;
 }
 
+// ------------------------------------------------------------------------
+// Super graphic Router: Legacy SAT graphics stay on the existing renderer.
+// New engines are loaded only for an explicit engine field in G-cell JSON.
+// ------------------------------------------------------------------------
+var gongbooGraphicAssets = { jsxScript: null, jsxStyle: null, jsxModule: null, threeModule: null };
+
+function loadGongbooGraphicScript(src) {
+    if (gongbooGraphicAssets.jsxScript) return gongbooGraphicAssets.jsxScript;
+    gongbooGraphicAssets.jsxScript = new Promise(function(resolve, reject) {
+        var script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = function() { reject(new Error('2D graphic library could not be loaded.')); };
+        document.head.appendChild(script);
+    });
+    return gongbooGraphicAssets.jsxScript;
+}
+
+function loadGongbooGraphicStyle(href) {
+    if (gongbooGraphicAssets.jsxStyle) return gongbooGraphicAssets.jsxStyle;
+    gongbooGraphicAssets.jsxStyle = new Promise(function(resolve) {
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        link.onload = resolve;
+        link.onerror = resolve; // Rendering can continue with the component's fallback styles.
+        document.head.appendChild(link);
+    });
+    return gongbooGraphicAssets.jsxStyle;
+}
+
+function renderNewGraphicEngine(parsedData) {
+    var engine = String(parsedData && parsedData.engine || '').toLowerCase().trim();
+    if (engine !== 'jsxgraph' && engine !== 'three3d') return null;
+
+    var hostId = 'gongboo_new_graphic_' + Math.random().toString(36).slice(2, 10);
+    var html = '<div style="margin:15px 0;padding:12px;background:#fff;border:1px solid #dbe3ee;border-radius:10px;">' +
+        '<div id="' + hostId + '" style="min-height:360px;display:grid;place-items:center;color:#64748b;font-size:13px;">Loading graphic…</div></div>';
+
+    setTimeout(function() {
+        var host = document.getElementById(hostId);
+        if (!host) return;
+        var fail = function() {
+            host.innerHTML = '<div style="padding:22px;text-align:center;color:#92400e;background:#fffbeb;border-radius:8px;">This problem graphic could not be displayed. The question and choices remain available.</div>';
+        };
+        try {
+            if (engine === 'jsxgraph') {
+                Promise.all([
+                    loadGongbooGraphicStyle('./graphics/jsxgraph-1.12.2.css?v=afe89c4'),
+                    loadGongbooGraphicScript('./graphics/jsxgraphcore-1.12.2.js?v=afe89c4')
+                ]).then(function() {
+                    if (!gongbooGraphicAssets.jsxModule) gongbooGraphicAssets.jsxModule = import('./graphics/jsxgraph-renderer.js?v=afe89c4');
+                    return gongbooGraphicAssets.jsxModule;
+                }).then(function(module) {
+                    var validation = module.validateJsxGraphPayload(parsedData);
+                    if (!validation.valid || !module.mountJsxGraph(host, parsedData)) throw new Error('Invalid JSXGraph payload.');
+                }).catch(function(error) { console.error('JSXGraph render failed:', error); fail(); });
+            } else {
+                if (!gongbooGraphicAssets.threeModule) gongbooGraphicAssets.threeModule = import('./graphics/g3scene.js?v=afe89c4');
+                gongbooGraphicAssets.threeModule.then(function(module) {
+                    var validation = module.validateThree3dPayload(parsedData);
+                    if (!validation.valid || !module.mountThree3d(host, parsedData)) throw new Error('Invalid Three.js payload.');
+                }).catch(function(error) { console.error('Three.js render failed:', error); fail(); });
+            }
+        } catch (error) {
+            console.error('New graphic router failed:', error);
+            fail();
+        }
+    }, 0);
+    return html;
+}
+
 function renderGraphic(jsonData) {
     var parsedData = parseGraphicPayload(jsonData);
     if (!parsedData) return "";
+
+    var newEngineGraphic = renderNewGraphicEngine(parsedData);
+    if (newEngineGraphic) return newEngineGraphic;
 
     var type = String(parsedData.type || '').trim();
     if (!type) return "";
