@@ -1,4 +1,5 @@
 import { createTemplate, listTemplates } from './jsxgraph-templates.js';
+import { createChartTemplate, listChartTemplates } from './chart-templates.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -53,11 +54,12 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
 }
 
-const entries = listTemplates().map((template) => {
+const entries = [...listTemplates().map((template) => {
   const [title, category, result] = TEMPLATE_INFO[template.id] || [template.label, 'Unclassified', template.label];
   const json = createTemplate(template.id);
   return { id: template.id, title, category, result, engine: json?.engine || 'jsxgraph', dimension: json?.engine === 'three3d' ? '3d' : '2d' };
-}).sort((a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
+}), ...listChartTemplates().map((template) => ({ id:template.id, title:template.label, category:template.category, result:template.result, engine:'chart', dimension:'2d' }))].sort((a, b) => a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
+function createAnyTemplate(id) { return createChartTemplate(id) || createTemplate(id); }
 
 function populateCategories() {
   const categories = [...new Set(entries.map((entry) => entry.category))].sort((a, b) => a.localeCompare(b));
@@ -76,7 +78,7 @@ function render() {
   $('results').innerHTML = matching.map((entry) => `<article><div class="tags"><span class="tag">${entry.dimension.toUpperCase()}</span><span class="tag">${escapeHtml(entry.category)}</span><span class="tag">${escapeHtml(entry.engine)}</span></div><h2>${escapeHtml(entry.title)}</h2><div class="meta"><strong>Result:</strong> ${escapeHtml(entry.result)}</div><code>Template ID: ${escapeHtml(entry.id)}</code><button data-copy-template="${escapeHtml(entry.id)}">Copy JSON</button></article>`).join('');
   $('empty').style.display = matching.length ? 'none' : 'block';
   document.querySelectorAll('[data-copy-template]').forEach((button) => button.addEventListener('click', async () => {
-    const json = JSON.stringify(createTemplate(button.dataset.copyTemplate), null, 2);
+    const json = JSON.stringify(createAnyTemplate(button.dataset.copyTemplate), null, 2);
     try { await navigator.clipboard.writeText(json); button.textContent = 'Copied'; setTimeout(() => { button.textContent = 'Copy JSON'; }, 1400); }
     catch { window.prompt('Copy this JSON:', json); }
   }));
