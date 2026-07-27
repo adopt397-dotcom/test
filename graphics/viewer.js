@@ -1,5 +1,5 @@
 import { mountSuperGraphic, validateSuperGraphic } from './super-graphic-engine.js';
-import { listTemplates, createTemplate } from './jsxgraph-templates.js?v=4b0821c';
+import { listTemplates, createTemplate } from './jsxgraph-templates.js?v=ed6afbe';
 let mountJsxGraph = function() { return null; };
 let validateJsxGraphPayload = function() { return { valid: false, errors: [{ code: 'JSXGRAPH_ADAPTER_LOADING', message: 'JSXGraph adapter is still loading.' }], warnings: [] }; };
 let three3dModule;
