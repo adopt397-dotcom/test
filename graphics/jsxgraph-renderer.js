@@ -169,6 +169,14 @@ function jsxGraphScene(payload) {
 export function validateJsxGraphPayload(payload) {
   const errors = [];
   if (!payload || String(payload.engine || '').toLowerCase() !== 'jsxgraph') errors.push({ code: 'JSXGRAPH_ENGINE_REQUIRED', path: 'engine', message: 'Expected engine: "jsxgraph".' });
+  if (payload && payload.type === 'multiPanel') {
+    const panels = payload?.data?.panels;
+    if (!Array.isArray(panels) || !panels.length) errors.push({ code: 'JSXGRAPH_PANELS_REQUIRED', path: 'data.panels', message: 'multiPanel requires at least one panel.' });
+    else panels.forEach((panel, index) => {
+      if (!panel || !(panel.scene || panel.data)) errors.push({ code: 'JSXGRAPH_PANEL_SCENE_REQUIRED', path: 'data.panels[' + index + ']', message: 'Each panel requires a scene.' });
+    });
+    return { valid: errors.length === 0, errors, warnings: [] };
+  }
   if (!payload || !Array.isArray(payload.objects) || !payload.objects.length) errors.push({ code: 'JSXGRAPH_OBJECTS_REQUIRED', path: 'objects', message: 'objects must contain at least one JSXGraph object.' });
   if (payload && Array.isArray(payload.objects)) payload.objects.forEach((object, index) => {
     if (!object || !object.type) errors.push({ code: 'JSXGRAPH_OBJECT_TYPE_REQUIRED', path: 'objects[' + index + '].type', message: 'Each object needs a type.' });

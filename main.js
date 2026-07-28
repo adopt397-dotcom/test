@@ -4568,7 +4568,7 @@ function renderNewGraphicEngine(parsedData) {
                     loadGongbooGraphicStyle('./graphics/jsxgraph-1.12.2.css?v=afe89c4'),
                     loadGongbooGraphicScript('./graphics/jsxgraphcore-1.12.2.js?v=afe89c4')
                 ]).then(function() {
-                    if (!gongbooGraphicAssets.jsxModule) gongbooGraphicAssets.jsxModule = import('./graphics/jsxgraph-renderer.js?v=2d-aspect-20260727');
+                    if (!gongbooGraphicAssets.jsxModule) gongbooGraphicAssets.jsxModule = import('./graphics/jsxgraph-renderer.js?v=2d-multipanel-20260727');
                     return gongbooGraphicAssets.jsxModule;
                 }).then(function(module) {
                     var validation = module.validateJsxGraphPayload(parsedData);
